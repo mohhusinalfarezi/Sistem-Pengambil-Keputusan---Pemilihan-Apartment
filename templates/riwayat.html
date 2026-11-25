@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Riwayat Keputusan – SPK Apartemen{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <h1><i class="bi bi-clock-history me-2 text-primary-spk"></i>Riwayat Keputusan</h1>
+    <div class="subtitle">Arsip hasil perhitungan SAW yang tersimpan</div>
+  </div>
+  <a href="{{ url_for('hasil') }}" class="btn-spk btn-spk-outline">
+    <i class="bi bi-arrow-left"></i> Ke Halaman Hasil
+  </a>
+</div>
+
+{% if sesi %}
+  {% for tanggal, rows in sesi.items() %}
+  <div class="glass-card mb-4">
+    <div class="card-header-spk" style="justify-content:space-between;">
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-calendar-event text-primary-spk"></i>
+        <strong>Sesi:</strong> {{ tanggal }}
+      </div>
+      <form method="POST" action="{{ url_for('hapus_sesi') }}"
+            onsubmit="return confirm('Hapus sesi {{ tanggal }}?');">
+        <input type="hidden" name="tanggal" value="{{ tanggal }}"/>
+        <button type="submit" class="btn-spk btn-spk-danger btn-spk-sm">
+          <i class="bi bi-trash3"></i> Hapus Sesi
+        </button>
+      </form>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="spk-table">
+        <thead>
+          <tr>
+            <th>Peringkat</th>
+            <th>Nama Apartemen</th>
+            <th>Lokasi</th>
+            <th>Nilai Preferensi</th>
+            <th>Visual</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr {% if r.peringkat == 1 %}style="background:var(--accent-bg);"{% endif %}>
+            <td>
+              {% if r.peringkat == 1 %}
+                <span class="badge-rank badge-rank-1">🥇</span>
+              {% elif r.peringkat == 2 %}
+                <span class="badge-rank badge-rank-2">🥈</span>
+              {% elif r.peringkat == 3 %}
+                <span class="badge-rank badge-rank-3">🥉</span>
+              {% else %}
+                <span class="badge-rank badge-rank-n">#{{ r.peringkat }}</span>
+              {% endif %}
+            </td>
+            <td style="font-weight:{% if r.peringkat == 1 %}800{% else %}600{% endif %};">{{ r.nama_apartemen }}</td>
+            <td style="font-size:.8rem; color:var(--text-muted);">{{ r.lokasi }}</td>
+            <td style="font-family:monospace; font-weight:700;">{{ "%.6f"|format(r.nilai_preferensi) }}</td>
+            <td style="min-width:120px;">
+              <div class="progress-spk">
+                <div class="bar {% if r.peringkat==1 %}valid{% endif %}" style="width:{{ (r.nilai_preferensi * 100)|round(2) }}%;"></div>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+<div class="glass-card">
+  <div class="card-pad text-center" style="padding:56px 24px;">
+    <i class="bi bi-clock-history" style="font-size:3rem; color:var(--border-light);"></i>
+    <h5 style="font-weight:700; margin-top:16px; color:var(--text-primary);">Belum ada riwayat tersimpan</h5>
+    <p class="text-muted mb-3" style="font-size:.84rem;">Hitung SAW terlebih dahulu, lalu klik "Simpan Riwayat".</p>
+    <a href="{{ url_for('hasil') }}" class="btn-spk btn-spk-primary">
+      <i class="bi bi-graph-up-arrow"></i> Hitung SAW Sekarang
+    </a>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

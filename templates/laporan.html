@@ -1,0 +1,377 @@
+{% extends "base.html" %}
+{% block title %}Laporan Keputusan SAW – SPK Apartemen{% endblock %}
+
+{% block content %}
+<!-- ==================== HEADER LAPORAN ==================== -->
+<div class="glass-card mb-4 report-section">
+  <div class="card-pad d-flex justify-content-between align-items-start flex-wrap gap-3">
+    <div>
+      <span class="badge-spk badge-primary mb-2 d-inline-block">
+        <i class="bi bi-file-earmark-bar-graph me-1"></i>Dokumen Resmi Keputusan SAW
+      </span>
+      <h1 class="h4 fw-bold mb-1" style="color: var(--text-primary); font-weight: 800;">
+        Laporan Hasil Keputusan SPK Pemilihan Apartemen (Metode SAW)
+      </h1>
+      <div class="d-flex flex-wrap align-items-center gap-3 mt-2" style="font-size: 0.82rem; color: var(--text-muted);">
+        <span><i class="bi bi-calendar3 me-1 text-primary-spk"></i><strong>Waktu Cetak:</strong> {{ waktu_cetak }}</span>
+        <span><i class="bi bi-sliders2 me-1 text-primary-spk"></i><strong>Kriteria:</strong> {{ kriterias|length }}</span>
+        <span><i class="bi bi-buildings me-1 text-primary-spk"></i><strong>Alternatif:</strong> {{ alternatifs|length }}</span>
+        <span>
+          <i class="bi bi-check2-circle me-1 text-primary-spk"></i>
+          <strong>Total Bobot:</strong> {{ "%.2f"|format(total_bobot * 100) }}%
+        </span>
+      </div>
+    </div>
+
+    <div class="d-flex align-items-center gap-2 flex-wrap no-print">
+      <a href="{{ url_for('hasil') }}" class="btn-spk btn-spk-outline text-decoration-none">
+        <i class="bi bi-arrow-left"></i> Hasil SAW
+      </a>
+      {% if saw and saw.results %}
+      <button type="button" class="btn-spk btn-spk-primary" onclick="window.print()">
+        <i class="bi bi-printer"></i> Cetak / Simpan PDF
+      </button>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ==================== ERRORS / DATA BELUM LENGKAP ==================== -->
+{% if errors or not saw or not saw.results %}
+<div class="glass-card mb-4" style="border:1.5px solid var(--cost-color);">
+  <div class="card-header-spk" style="color:var(--cost-color);">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    Laporan Belum Dapat Dibuat — Data Belum Lengkap
+  </div>
+  <div class="card-pad">
+    {% if errors %}
+    <ul class="mb-3" style="font-size:.84rem;">
+      {% for e in errors %}
+      <li style="color:var(--cost-color); margin-bottom:4px;">{{ e }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted mb-3" style="font-size:.84rem;">
+      Silakan lengkapi data kriteria dan alternatif terlebih dahulu sebelum mencetak laporan.
+    </p>
+    {% endif %}
+    <a href="{{ url_for('alternatif_list') }}" class="btn-spk btn-spk-primary btn-spk-sm text-decoration-none no-print">
+      <i class="bi bi-pencil"></i> Lengkapi Data Alternatif
+    </a>
+  </div>
+</div>
+{% else %}
+
+<!-- ==================== 1. KRITERIA DAN BOBOT ==================== -->
+<div class="glass-card mb-4 report-section">
+  <div class="card-header-spk">
+    <i class="bi bi-1-circle-fill text-primary-spk"></i>
+    <span>1. Kriteria dan Bobot Keputusan</span>
+  </div>
+  <div class="card-pad">
+    <div class="report-table-wrap" style="overflow-x:auto;">
+      <table class="spk-table">
+        <thead>
+          <tr>
+            <th style="width: 48px;">No</th>
+            <th>Kode</th>
+            <th>Nama Kriteria</th>
+            <th class="text-center">Tipe</th>
+            <th class="text-end">Bobot (w<sub>j</sub>)</th>
+            <th class="text-end">Persentase (%)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for krt in kriterias %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td><span class="badge-spk badge-primary">{{ krt.kode }}</span></td>
+            <td style="font-weight: 600;">{{ krt.nama }}</td>
+            <td class="text-center">
+              <span class="badge-spk {% if krt.tipe == 'benefit' %}badge-benefit{% else %}badge-cost{% endif %}">
+                {{ krt.tipe|capitalize }}
+              </span>
+            </td>
+            <td class="text-end font-mono">{{ "%.4f"|format(krt.bobot) }}</td>
+            <td class="text-end font-mono fw-semibold">{{ "%.2f"|format(krt.bobot * 100) }}%</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4" class="text-end">Total Bobot Keseluruhan</td>
+            <td class="text-end font-mono">{{ "%.4f"|format(saw.bobot|sum) }}</td>
+            <td class="text-end font-mono">{{ "%.2f"|format((saw.bobot|sum) * 100) }}%</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 2. MATRIKS KEPUTUSAN (X) ==================== -->
+<div class="glass-card mb-4 report-section">
+  <div class="card-header-spk">
+    <i class="bi bi-2-circle-fill text-primary-spk"></i>
+    <span>2. Matriks Keputusan Awal (X)</span>
+  </div>
+  <div class="card-pad">
+    <div class="report-table-wrap" style="overflow-x:auto;">
+      <table class="spk-table">
+        <thead>
+          <tr>
+            <th>Alternatif</th>
+            {% for krt in kriterias %}
+            <th class="text-center">
+              {{ krt.kode }}<br>
+              <span class="badge-spk {% if krt.tipe == 'benefit' %}badge-benefit{% else %}badge-cost{% endif %}" style="font-size:.6rem; padding:2px 6px;">
+                {{ krt.tipe|capitalize }}
+              </span>
+            </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in saw.results %}
+          <tr>
+            <td style="font-weight: 600;">{{ r.alternatif.nama_apartemen }}</td>
+            {% for val in r.matrix_x_row %}
+            <td class="text-center font-mono">{{ val }}</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>Nilai Pembagi Ekstrem</td>
+            {% for j in range(kriterias|length) %}
+            <td class="text-center font-mono" style="color: var(--primary);">
+              {% if kriterias[j].tipe == 'benefit' %}
+                Max: {{ saw.col_max[j] }}
+              {% else %}
+                Min: {{ saw.col_min[j] }}
+              {% endif %}
+            </td>
+            {% endfor %}
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 3. MATRIKS NORMALISASI (R) & NILAI PREFERENSI (V) ==================== -->
+<div class="glass-card mb-4 report-section">
+  <div class="card-header-spk">
+    <i class="bi bi-3-circle-fill text-primary-spk"></i>
+    <span>3. Matriks Normalisasi (R) dan Nilai Preferensi (V)</span>
+  </div>
+  <div class="card-pad">
+    <div class="report-table-wrap" style="overflow-x:auto;">
+      <table class="spk-table">
+        <thead>
+          <tr>
+            <th>Peringkat</th>
+            <th>Nama Apartemen</th>
+            {% for krt in kriterias %}
+            <th class="text-center">
+              {{ krt.kode }}<br>
+              <span style="font-size:.65rem; font-weight:600; color:var(--text-muted);">w={{ "%.2f"|format(krt.bobot) }}</span>
+            </th>
+            {% endfor %}
+            <th class="text-end">Skor Akhir (V<sub>i</sub>)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in saw.results %}
+          <tr {% if r.peringkat == 1 %}style="background: rgba(240, 238, 255, 0.65);"{% endif %}>
+            <td>
+              {% if r.peringkat == 1 %}
+                <span class="badge-rank badge-rank-1">#1</span>
+              {% elif r.peringkat == 2 %}
+                <span class="badge-rank badge-rank-2">#2</span>
+              {% elif r.peringkat == 3 %}
+                <span class="badge-rank badge-rank-3">#3</span>
+              {% else %}
+                <span class="badge-rank badge-rank-n">#{{ r.peringkat }}</span>
+              {% endif %}
+            </td>
+            <td style="font-weight: {% if r.peringkat == 1 %}800{% else %}600{% endif %};">
+              {{ r.alternatif.nama_apartemen }}
+            </td>
+            {% for v_norm in r.matrix_r_row %}
+            <td class="text-center font-mono">{{ "%.4f"|format(v_norm) }}</td>
+            {% endfor %}
+            <td class="text-end font-mono fw-bold" style="color: var(--primary);">
+              {{ "%.6f"|format(r.nilai_preferensi) }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 4. GRAFIK PERBANDINGAN SKOR PREFERENSI ==================== -->
+<div class="glass-card mb-4 report-section">
+  <div class="card-header-spk d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-2">
+      <i class="bi bi-4-circle-fill text-primary-spk"></i>
+      <span>4. Grafik Perbandingan Skor Preferensi (V<sub>i</sub>)</span>
+    </div>
+    <span class="badge-spk badge-primary" style="font-size: 0.7rem;">Peringkat #1 s.d. #{{ saw.results|length }}</span>
+  </div>
+  <div class="card-pad">
+    <div style="position: relative; width: 100%; height: {{ [230, (saw.results|length * 42)]|max }}px;">
+      <canvas id="laporanRankingChart" aria-label="Grafik Peringkat Apartemen Metode SAW"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 5. KESIMPULAN REKOMENDASI ==================== -->
+{% set r1 = saw.results[0] %}
+{% set r2 = saw.results[1] if saw.results|length > 1 else None %}
+{% set r3 = saw.results[2] if saw.results|length > 2 else None %}
+<div class="glass-card mb-4 report-section">
+  <div class="card-header-spk">
+    <i class="bi bi-5-circle-fill text-primary-spk"></i>
+    <span>5. Kesimpulan Rekomendasi Keputusan</span>
+  </div>
+  <div class="card-pad">
+    <div class="p-3 rounded-3" style="background: rgba(240, 238, 255, 0.55); border: 1px solid rgba(124, 105, 239, 0.22);">
+      <p class="mb-2" style="font-size: 0.92rem; line-height: 1.65; color: var(--text-primary);">
+        Berdasarkan hasil perhitungan Sistem Pendukung Keputusan menggunakan metode
+        <strong>Simple Additive Weighting (SAW)</strong> terhadap <strong>{{ kriterias|length }} kriteria</strong>
+        dan <strong>{{ alternatifs|length }} alternatif</strong> apartemen di Kota Semarang,
+        diperoleh rekomendasi utama <strong>Peringkat #1</strong> yaitu
+        <strong style="color: var(--primary);">{{ r1.alternatif.nama_apartemen }}</strong>
+        {% if r1.alternatif.lokasi %}({{ r1.alternatif.lokasi }}){% endif %}
+        dengan nilai preferensi akhir tertinggi sebesar
+        <strong class="font-mono" style="color: var(--primary);">V = {{ "%.4f"|format(r1.nilai_preferensi) }}</strong>
+        <span class="text-muted">({{ "%.6f"|format(r1.nilai_preferensi) }})</span>.
+      </p>
+      {% if r2 or r3 %}
+      <p class="mb-0" style="font-size: 0.88rem; line-height: 1.65; color: var(--text-muted);">
+        Sebagai alternatif pembanding terdekat, posisi berikutnya ditempati oleh
+        {% if r2 %}
+          <strong>Peringkat #2 {{ r2.alternatif.nama_apartemen }}</strong>
+          dengan skor <strong class="font-mono">V = {{ "%.4f"|format(r2.nilai_preferensi) }}</strong>
+        {% endif %}
+        {% if r2 and r3 %}dan {% endif %}
+        {% if r3 %}
+          <strong>Peringkat #3 {{ r3.alternatif.nama_apartemen }}</strong>
+          dengan skor <strong class="font-mono">V = {{ "%.4f"|format(r3.nilai_preferensi) }}</strong>
+        {% endif %}.
+      </p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if saw and saw.results %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const canvas = document.getElementById('laporanRankingChart');
+  if (!canvas || typeof Chart === 'undefined') return;
+
+  const laporanData = [
+    {% for r in saw.results %}
+    {
+      peringkat: {{ r.peringkat }},
+      nama: {{ r.alternatif.nama_apartemen|tojson }},
+      nilai: {{ "%.6f"|format(r.nilai_preferensi) }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  const labels = laporanData.map(d => `#${d.peringkat} ${d.nama}`);
+  const values = laporanData.map(d => d.nilai);
+  const bgColors = laporanData.map(d => {
+    if (d.peringkat === 1) return '#7C69EF';
+    if (d.peringkat === 2 || d.peringkat === 3) return '#A78BFA';
+    return '#DDD6FE';
+  });
+  const borderColors = laporanData.map(d => {
+    if (d.peringkat === 1) return '#6B58DE';
+    if (d.peringkat === 2 || d.peringkat === 3) return '#9370F8';
+    return '#C4B5FD';
+  });
+
+  const laporanChart = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Skor Preferensi (V_i)',
+        data: values,
+        backgroundColor: bgColors,
+        borderColor: borderColors,
+        borderWidth: 1,
+        borderRadius: 8,
+        borderSkipped: false,
+        barThickness: 22,
+        maxBarThickness: 28
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 350 },
+      layout: { padding: { top: 4, right: 16, bottom: 4, left: 4 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(30, 41, 59, 0.94)',
+          borderColor: '#7C69EF',
+          borderWidth: 1,
+          padding: 10,
+          cornerRadius: 10,
+          callbacks: {
+            title: (items) => {
+              const d = items.length ? laporanData[items[0].dataIndex] : null;
+              return d ? d.nama : '';
+            },
+            label: (ctx) => {
+              const d = laporanData[ctx.dataIndex];
+              return d ? [` Peringkat: #${d.peringkat}`, ` Skor V_i: ${d.nilai.toFixed(4)}`] : '';
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          suggestedMax: 1.0,
+          border: { display: false },
+          grid: { color: 'rgba(124, 105, 239, 0.08)' },
+          ticks: {
+            color: '#475569',
+            font: { family: "'Plus Jakarta Sans', sans-serif", size: 11, weight: '600' }
+          }
+        },
+        y: {
+          border: { display: false },
+          grid: { display: false },
+          ticks: {
+            color: '#0F172A',
+            font: { family: "'Plus Jakarta Sans', sans-serif", size: 11.5, weight: '700' }
+          }
+        }
+      }
+    }
+  });
+
+  // Ensure crisp chart proportions right before printing / saving PDF
+  window.addEventListener('beforeprint', () => {
+    laporanChart.resize();
+  });
+});
+</script>
+{% endif %}
+{% endblock %}

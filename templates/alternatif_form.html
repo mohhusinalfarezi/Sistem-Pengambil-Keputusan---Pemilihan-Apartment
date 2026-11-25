@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+{% block title %}{{ action }} Apartemen – SPK Apartemen{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1><i class="bi bi-buildings me-2 text-primary-spk"></i>{{ action }} Apartemen</h1>
+  <div class="subtitle">Data apartemen dan input matriks keputusan (X)</div>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="glass-card">
+      <div class="card-header-spk">
+        <i class="bi bi-pencil-square text-primary-spk"></i>
+        Data Apartemen & Matriks Keputusan
+      </div>
+      <div class="card-pad">
+        <form method="POST">
+
+          <!-- Data Umum -->
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <label class="form-label">Nama Apartemen <span style="color:var(--cost-color);">*</span></label>
+              <input type="text" name="nama_apartemen" class="form-control"
+                     value="{{ form.nama_apartemen if form.nama_apartemen else '' }}"
+                     placeholder="Contoh: Tamansari Panoramic" required/>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Lokasi <span style="color:var(--cost-color);">*</span></label>
+              <input type="text" name="lokasi" class="form-control"
+                     value="{{ form.lokasi if form.lokasi else '' }}"
+                     placeholder="Contoh: Jl. Pemuda, Semarang Tengah" required/>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Deskripsi</label>
+              <textarea name="deskripsi" class="form-control" rows="2"
+                        placeholder="Deskripsi singkat apartemen...">{{ form.deskripsi if form.deskripsi else '' }}</textarea>
+            </div>
+          </div>
+
+          <!-- Matriks Nilai -->
+          <div class="glass-card mb-4" style="border:1.5px solid var(--primary-soft); box-shadow:none;">
+            <div class="card-header-spk" style="background:var(--accent-bg);">
+              <i class="bi bi-grid-3x3 text-primary-spk"></i>
+              Input Matriks Keputusan (X)
+            </div>
+            <div class="card-pad">
+              {% if kriterias %}
+              <div style="overflow-x:auto;">
+                <table class="spk-table">
+                  <thead>
+                    <tr>
+                      <th>Kode</th>
+                      <th>Nama Kriteria</th>
+                      <th>Tipe</th>
+                      <th>Nilai <span style="color:var(--cost-color);">*</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for krt in kriterias %}
+                    <tr>
+                      <td><span class="badge-spk badge-primary">{{ krt.kode }}</span></td>
+                      <td style="font-weight:600;">{{ krt.nama }}</td>
+                      <td>
+                        <span class="badge-spk {% if krt.tipe=='benefit' %}badge-benefit{% else %}badge-cost{% endif %}">
+                          {{ krt.tipe | upper }}
+                        </span>
+                      </td>
+                      <td style="min-width:220px;">
+                        {% set default_val = '' %}
+                        {% if form %}
+                          {% if form.get is defined %}
+                            {% set default_val = form.get('nilai_' ~ krt.id, '') %}
+                          {% elif nilai_map is defined and nilai_map.get((alt.id if alt else 0, krt.id)) is not none %}
+                            {% set default_val = nilai_map.get((alt.id if alt else 0, krt.id)) %}
+                          {% endif %}
+                        {% endif %}
+                        {% set cur_val = default_val|int if default_val != '' and default_val is not none else -1 %}
+
+                        {% if krt.kode|upper == 'C3' %}
+                          <select name="nilai_{{ krt.id }}" class="form-select form-select-sm" style="min-width: 210px;" required>
+                            <option value="" {% if default_val == '' %}selected{% endif %} disabled>-- Pilih Skala Fasilitas --</option>
+                            <option value="1" {% if cur_val == 1 %}selected{% endif %}>1 - Sangat Minim (Parkir terbatas, tanpa lift/kolam/gym)</option>
+                            <option value="2" {% if cur_val == 2 %}selected{% endif %}>2 - Kurang Lengkap (Lift &amp; parkir standar saja)</option>
+                            <option value="3" {% if cur_val == 3 %}selected{% endif %}>3 - Cukup Lengkap (Parkir, minimarket, 1 fasilitas utama)</option>
+                            <option value="4" {% if cur_val == 4 %}selected{% endif %}>4 - Lengkap (Kolam renang, gym, parkir, semi-furnished)</option>
+                            <option value="5" {% if cur_val == 5 %}selected{% endif %}>5 - Sangat Lengkap (Fasilitas premium lengkap &amp; full-furnished)</option>
+                          </select>
+                        {% elif krt.kode|upper == 'C5' %}
+                          <select name="nilai_{{ krt.id }}" class="form-select form-select-sm" style="min-width: 210px;" required>
+                            <option value="" {% if default_val == '' %}selected{% endif %} disabled>-- Pilih Skala Keamanan --</option>
+                            <option value="1" {% if cur_val == 1 %}selected{% endif %}>1 - Sangat Rendah (Penjagaan minim, tanpa CCTV/akses)</option>
+                            <option value="2" {% if cur_val == 2 %}selected{% endif %}>2 - Kurang Memadai (Sekuriti bergantian, CCTV terbatas)</option>
+                            <option value="3" {% if cur_val == 3 %}selected{% endif %}>3 - Cukup Baik (Sekuriti 24 jam &amp; CCTV lobi utama)</option>
+                            <option value="4" {% if cur_val == 4 %}selected{% endif %}>4 - Baik (Sekuriti 24 jam, CCTV tiap lantai &amp; access card)</option>
+                            <option value="5" {% if cur_val == 5 %}selected{% endif %}>5 - Sangat Ketat (Keamanan berlapis, access card per lantai &amp; interkom)</option>
+                          </select>
+                        {% else %}
+                          <input type="number" name="nilai_{{ krt.id }}"
+                                 class="form-control"
+                                 value="{{ default_val }}"
+                                 step="any"
+                                 {% if krt.tipe == 'cost' %}min="0.01"{% endif %}
+                                 placeholder="{% if krt.tipe == 'cost' %}> 0{% else %}angka{% endif %}"
+                                 required
+                                 style="font-size:.86rem;"/>
+                          {% if krt.tipe == 'cost' %}
+                            <div class="form-text" style="color:var(--cost-color); font-size:.68rem;">
+                              <i class="bi bi-info-circle"></i> Nilai cost harus &gt; 0
+                            </div>
+                          {% endif %}
+                        {% endif %}
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              {% else %}
+              <div class="text-center py-4" style="color:var(--text-muted);">
+                <i class="bi bi-exclamation-triangle" style="font-size:2rem; color:var(--cost-color); opacity:.5;"></i>
+                <div class="mt-2">Belum ada kriteria. Tambahkan kriteria terlebih dahulu.</div>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- ==================== PANDUAN RUBRIK PENILAIAN (C3 & C5) ==================== -->
+          <div class="glass-card mb-4 overflow-hidden" style="border: 1px solid rgba(124, 105, 239, 0.25);">
+            <div class="card-header-spk d-flex justify-content-between align-items-center"
+                 style="cursor: pointer; user-select: none;"
+                 data-bs-toggle="collapse"
+                 data-bs-target="#collapseRubrikForm"
+                 aria-expanded="false"
+                 aria-controls="collapseRubrikForm">
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-journal-bookmark-fill text-primary-spk"></i>
+                <span class="fw-bold" style="font-size: 0.88rem; color: var(--text-primary);">
+                  Panduan Rubrik Penilaian Skala 1–5 (C3 &amp; C5)
+                </span>
+              </div>
+              <span class="badge-spk badge-primary d-inline-flex align-items-center gap-1" style="font-size: 0.72rem;">
+                <i class="bi bi-info-circle"></i> Buka / Tutup Panduan <i class="bi bi-chevron-down ms-1"></i>
+              </span>
+            </div>
+            
+            <div class="collapse" id="collapseRubrikForm">
+              <div class="card-pad" style="background: rgba(255, 255, 255, 0.5);">
+                <div class="row g-3">
+                  
+                  <!-- Kolom Kiri: Rubrik C3 -->
+                  <div class="col-md-6">
+                    <div class="p-3 rounded-4 h-100" style="background: rgba(240, 238, 255, 0.6); border: 1px solid rgba(124, 105, 239, 0.2);">
+                      <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="badge-spk badge-primary" style="font-size: 0.7rem;">C3</span>
+                        <span class="fw-bold" style="color: var(--text-primary); font-size: 0.84rem;">Fasilitas Gedung &amp; Unit (Skala 1–5)</span>
+                      </div>
+                      <ul class="list-unstyled mb-0 d-flex flex-column gap-2" style="font-size: 0.78rem;">
+                        <li class="d-flex align-items-start gap-2">
+                          <span class="badge-rank badge-rank-n" style="min-width: 22px; height: 22px; font-size: 0.68rem;">1</span>
+                          <div><strong>1 - Sangat Minim:</strong> Parkir terbatas, tanpa lift/kolam/gym.</div>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                          <span class="badge-rank badge-rank-n" style="min-width: 22px; height: 22px; font-size: 0.68rem;">2</span>
+                          <div><strong>2 - Kurang Lengkap:</strong> Lift &amp; parkir standar saja.</div>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                          <span class="badge-rank badge-rank-n" style="min-width: 22px; height: 22px; font-size: 0.68rem;">3</span>
+                          <div><strong>3 - Cukup Lengkap:</strong> Parkir, minimarket, 1 fasilitas utama.</div>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                          <span class="badge-rank badge-rank-n" style="min-width: 22px; height: 22px; font-size: 0.68rem;">4</span>
+                          <div><strong>4 - Lengkap:</strong> Kolam renang, gym, parkir, semi-furnished.</div>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                          <span class="badge-rank badge-rank-1" style="min-width: 22px; height: 22px; font-size: 0.68rem;">5</span>
+                          <div><strong>5 - Sangat Lengkap:</strong> Fasilitas premium lengkap &amp; full-furnished.</div>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <!-- Kolom Kanan: Rubrik C5 -->
+                  <div class="col-md-6">
+                    <div class="p-3 rounded-4 h-100" style="background: rgba(236, 253, 245, 0.6); border: 1px solid rgba(16, 185, 129, 0.2);">
+                      <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="badge-spk badge-benefit" style="font-size: 0.7rem;">C5</span>
+                        <span class="fw-bold" style="color: var(--text-primary); font-size: 0.84rem;">Tingkat Keamanan (Skala 1–5)</span>
+                      </div>
+                      <ul class="list-unstyled mb-0 d-flex flex-column gap-2" style="font-size: 0.78rem;">
+                        <li class="d-flex align-items-start gap-2">
+                          <span class="badge-rank badge-rank-n" style="min-width: 22px; height: 22px; font-size: 0.68rem;">1</span>
+                          <div><strong>1 - Sangat Rendah:</strong> Penjagaan minim, tanpa CCTV/akses.</div>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                          <span class="badge-rank badge-rank-n" style="min-width: 22px; height: 22px; font-size: 0.68rem;">2</span>
+                          <div><strong>2 - Kurang Memadai:</strong> Sekuriti bergantian, CCTV terbatas.</div>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                          <span class="badge-rank badge-rank-n" style="min-width: 22px; height: 22px; font-size: 0.68rem;">3</span>
+                          <div><strong>3 - Cukup Baik:</strong> Sekuriti 24 jam &amp; CCTV lobi utama.</div>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                          <span class="badge-rank badge-rank-n" style="min-width: 22px; height: 22px; font-size: 0.68rem;">4</span>
+                          <div><strong>4 - Baik:</strong> Sekuriti 24 jam, CCTV tiap lantai &amp; access card.</div>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                          <span class="badge-rank badge-rank-1" style="min-width: 22px; height: 22px; font-size: 0.68rem;">5</span>
+                          <div><strong>5 - Sangat Ketat:</strong> Keamanan berlapis, access card per lantai &amp; interkom.</div>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn-spk btn-spk-primary" {% if not kriterias %}disabled{% endif %}>
+              <i class="bi bi-save"></i> Simpan
+            </button>
+            <a href="{{ url_for('alternatif_list') }}" class="btn-spk btn-spk-outline">
+              <i class="bi bi-arrow-left"></i> Batal
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

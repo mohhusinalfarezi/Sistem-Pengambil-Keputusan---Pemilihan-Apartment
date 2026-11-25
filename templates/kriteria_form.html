@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}{{ action }} Kriteria – SPK Apartemen{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1><i class="bi bi-sliders2 me-2 text-primary-spk"></i>{{ action }} Kriteria</h1>
+  <div class="subtitle">Isi informasi dan bobot kriteria keputusan</div>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-6 col-md-8">
+    <div class="glass-card">
+      <div class="card-header-spk">
+        <i class="bi bi-pencil-square text-primary-spk"></i>
+        Form Kriteria
+      </div>
+      <div class="card-pad">
+        <form method="POST">
+
+          <div class="mb-3">
+            <label class="form-label">Kode Kriteria <span style="color:var(--cost-color);">*</span></label>
+            <input type="text" name="kode" class="form-control"
+                   value="{{ form.kode if form.kode else '' }}"
+                   placeholder="Contoh: C8" maxlength="10" required/>
+            <div class="form-text">Kode unik, otomatis huruf kapital.</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Nama Kriteria <span style="color:var(--cost-color);">*</span></label>
+            <input type="text" name="nama" class="form-control"
+                   value="{{ form.nama if form.nama else '' }}"
+                   placeholder="Contoh: Luas Parkir" required/>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Tipe <span style="color:var(--cost-color);">*</span></label>
+            <select name="tipe" class="form-select" required>
+              <option value="" disabled {% if not form.tipe %}selected{% endif %}>— Pilih Tipe —</option>
+              <option value="benefit" {% if form.tipe == 'benefit' %}selected{% endif %}>
+                BENEFIT (semakin besar → semakin baik)
+              </option>
+              <option value="cost" {% if form.tipe == 'cost' %}selected{% endif %}>
+                COST (semakin kecil → semakin baik)
+              </option>
+            </select>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label">
+              Bobot <span style="color:var(--cost-color);">*</span>
+              <span class="text-muted" style="font-weight:400; font-size:.76rem;"> (0 &lt; bobot ≤ 1, misal 0.20 = 20%)</span>
+            </label>
+            <input type="number" name="bobot" class="form-control"
+                   id="bobotInput"
+                   value="{{ form.bobot if form.bobot else '' }}"
+                   step="0.01" min="0.01" max="1" required
+                   oninput="updateBobotDisplay(this.value)"/>
+            <div class="mt-2">
+              <div class="progress-spk">
+                <div class="bar" id="bobotBar"
+                     style="width:{{ ((form.bobot|float) * 100)|round(1) if form.bobot else 0 }}%;"></div>
+              </div>
+              <div class="text-muted mt-1" style="font-size:.74rem;" id="bobotPct">
+                {{ (((form.bobot|float) * 100)|round(1))|string + '%' if form.bobot else '0%' }}
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn-spk btn-spk-primary">
+              <i class="bi bi-save"></i> Simpan
+            </button>
+            <a href="{{ url_for('kriteria_list') }}" class="btn-spk btn-spk-outline">
+              <i class="bi bi-arrow-left"></i> Batal
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateBobotDisplay(val) {
+  const pct = Math.min(parseFloat(val || 0) * 100, 100).toFixed(1);
+  document.getElementById('bobotBar').style.width = pct + '%';
+  document.getElementById('bobotPct').textContent = pct + '%';
+}
+</script>
+{% endblock %}

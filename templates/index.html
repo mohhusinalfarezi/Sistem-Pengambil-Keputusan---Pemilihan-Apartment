@@ -1,0 +1,938 @@
+{% extends "base.html" %}
+{% block title %}Dashboard – SPK Apartemen Semarang{% endblock %}
+
+{% block content %}
+<!-- Bento Grid Layout: 1 Baris Utama (Grid 4 : 8) -->
+<div class="row g-4 align-items-stretch">
+  
+  <!-- ==================== KOLOM KIRI (col-lg-4) ==================== -->
+  <div class="col-lg-4 d-flex flex-column gap-3">
+    
+    <!-- 1) Kartu Hero 3D -->
+    <div class="glass-card p-4 d-flex flex-column justify-content-between position-relative overflow-hidden flex-grow-1">
+      <!-- Header Tag -->
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <span class="badge-spk badge-primary" style="font-size: 0.72rem;">
+          <i class="bi bi-cpu me-1"></i>SPK Decision Hub
+        </span>
+        <span class="badge-spk badge-benefit" style="font-size: 0.72rem;">
+          <i class="bi bi-shield-check me-1"></i>SAW System
+        </span>
+      </div>
+
+      <!-- 3D Asset Container (Transparan tanpa border putus-putus) -->
+      <div id="slot-3d-asset" 
+           style="min-height: 260px; height: 300px; width: 100%; position: relative; cursor: grab; background: transparent; border-radius: 16px; overflow: hidden;"
+           class="mb-1">
+
+      </div>
+
+      <!-- Info & Action -->
+      <div class="mt-2">
+        <h2 class="h5 fw-bold mb-1" style="color: var(--text-primary); font-size: 1.25rem; font-weight: 800;">
+          SPK Pemilihan Apartemen
+        </h2>
+        <p class="mb-3" style="font-size: 0.8rem; line-height: 1.45; color: var(--text-muted);">
+          Metode Simple Additive Weighting (SAW) untuk rekomendasi hunian vertikal terbaik di Kota Semarang secara objektif &amp; terukur.
+        </p>
+        <a href="{{ url_for('hasil') }}" class="btn-spk btn-spk-primary w-100 justify-content-center py-2 px-3" style="border-radius: var(--radius-pill); font-weight: 700;">
+          <span>Mulai Simulasi</span> <i class="bi bi-chevron-right ms-1"></i>
+        </a>
+      </div>
+    </div>
+
+    <!-- 2) Kartu Skor Kecocokan Terbaik (SAW) + Circular Ring -->
+    <div class="glass-card p-3 d-flex align-items-center justify-content-between">
+      <div class="pe-2">
+        <span class="badge-spk badge-primary mb-1 d-inline-block" style="font-size: 0.68rem;">
+          <i class="bi bi-stars me-1"></i>Analisis Utilitas SAW
+        </span>
+        <div class="fw-bold mb-1" style="color: var(--text-primary); font-size: 0.96rem;">
+          Skor Kecocokan Terbaik (SAW)
+        </div>
+        <div class="mb-1 text-truncate" id="bestFitApartmentName" style="font-size: 0.8rem; color: var(--text-muted); max-width: 170px;">
+          {% if top %}
+            {{ top.alternatif.nama_apartemen }} (Peringkat #1)
+          {% else %}
+            Belum ada data
+          {% endif %}
+        </div>
+        <div class="fw-semibold" style="font-size: 0.72rem; color: var(--benefit-color);">
+          <i class="bi bi-check-circle-fill me-1"></i> Rekomendasi Utama Model
+        </div>
+      </div>
+      
+      <!-- Circular Ring / Doughnut (Chart.js) -->
+      <div class="position-relative flex-shrink-0" style="width: 100px; height: 100px;">
+        <canvas id="circularScoreChart" width="100" height="100"></canvas>
+        <div class="position-absolute top-50 start-50 translate-middle text-center" style="pointer-events: none;">
+          <div id="circularScoreValue" class="fw-extrabold font-mono" style="font-size: 1.05rem; color: var(--primary); line-height: 1;">
+            {% if top %}{{ "%.2f"|format(top.nilai_preferensi) }}{% else %}—{% endif %}
+          </div>
+          <div style="font-size: 0.56rem; text-transform: uppercase; color: var(--text-muted); margin-top: 2px;">Skor V</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ==================== KOLOM KANAN (col-lg-8) ==================== -->
+  <div class="col-lg-8 d-flex flex-column gap-3">
+    
+    <!-- 1) Baris Atas: 3 Kartu KPI Sejajar -->
+    <div class="row g-3">
+      
+      <!-- KPI 1: Rekomendasi #1 -->
+      <div class="col-md-4">
+        <div class="glass-card p-3 h-100 d-flex flex-column justify-content-between">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="fw-bold" style="font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em;">
+              Rekomendasi #1
+            </span>
+            <span class="badge-rank badge-rank-1" style="width: 26px; height: 26px; font-size: 0.72rem;">🥇</span>
+          </div>
+          <div>
+            <div class="fw-bold mb-1 text-truncate" id="topApartmentName" style="color: var(--text-primary); font-size: 1.1rem;">
+              {% if top %}{{ top.alternatif.nama_apartemen }}{% else %}Belum Ada Data{% endif %}
+            </div>
+            <div class="d-flex align-items-baseline gap-2">
+              <span class="font-mono fw-extrabold" id="topApartmentScore" style="font-size: 1.55rem; font-weight: 800; color: var(--primary);">
+                {% if top %}{{ "%.4f"|format(top.nilai_preferensi) }}{% else %}—{% endif %}
+              </span>
+              <span class="small fw-semibold" style="font-size: 0.72rem; color: var(--text-muted);">Skor V<sub>i</sub></span>
+            </div>
+          </div>
+          <!-- Sparkline 1 -->
+          <div class="mt-2 kpi-sparkline-wrap">
+            <svg id="sparklineTop" class="kpi-sparkline-svg" aria-label="Kurva Skor Preferensi SAW"></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI 2: Cakupan Data -->
+      <div class="col-md-4">
+        <div class="glass-card p-3 h-100 d-flex flex-column justify-content-between">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="fw-bold" style="font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em;">
+              Cakupan Data
+            </span>
+            <span class="badge-spk badge-primary" style="font-size: 0.68rem;"><i class="bi bi-buildings"></i></span>
+          </div>
+          <div>
+            <div class="fw-bold mb-1" style="color: var(--text-primary); font-size: 1.1rem;">
+              {{ n_alternatif }} Alternatif &amp; {{ n_kriteria }} Kriteria
+            </div>
+            <div id="costBenefitSummary" class="small fw-semibold" style="font-size: 0.74rem; color: var(--text-muted);">
+              3 Kriteria Cost &bull; 4 Kriteria Benefit
+            </div>
+          </div>
+          <!-- Sparkline 2 -->
+          <div class="mt-2 kpi-sparkline-wrap">
+            <svg id="sparklineData" class="kpi-sparkline-svg" aria-label="Kurva Cakupan Data Alternatif dan Kriteria"></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI 3: Akurasi Bobot -->
+      {% set pct = (total_bobot * 100) | round(2) %}
+      {% set is_valid_weight = (pct - 100)|abs < 0.01 %}
+      <div class="col-md-4">
+        <div class="glass-card p-3 h-100 d-flex flex-column justify-content-between">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="fw-bold" style="font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em;">
+              Akurasi Bobot
+            </span>
+            <span class="badge-spk {% if is_valid_weight %}badge-benefit{% else %}badge-cost{% endif %}" style="font-size: 0.68rem;">
+              {% if is_valid_weight %}Valid 100%{% else %}Perlu Cek{% endif %}
+            </span>
+          </div>
+          <div>
+            <div class="d-flex align-items-baseline gap-2">
+              <span class="font-mono fw-extrabold" style="font-size: 1.55rem; font-weight: 800; color: {% if is_valid_weight %}var(--benefit-color){% else %}var(--cost-color){% endif %};">
+                {{ pct }}%
+              </span>
+              <span class="small fw-semibold" style="font-size: 0.72rem; color: var(--text-muted);">(Σw<sub>j</sub> = {{ "%.2f"|format(total_bobot) }})</span>
+            </div>
+            <div class="small fw-semibold" style="font-size: 0.74rem; color: var(--text-muted);">
+              {% if is_valid_weight %}Distribusi bobot terstandarisasi{% else %}Total bobot belum 100%{% endif %}
+            </div>
+          </div>
+          <!-- Sparkline 3 -->
+          <div class="mt-2 kpi-sparkline-wrap">
+            <svg id="sparklineWeight" class="kpi-sparkline-svg" aria-label="Kurva Distribusi Bobot Kriteria"></svg>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 2) Baris Tengah: Kartu Tabel "Top Peringkat Apartemen" (Mengisi Ruang Kosong, flex-grow-1) -->
+    <div class="glass-card flex-grow-1 d-flex flex-column overflow-hidden">
+      <div class="card-header-spk d-flex justify-content-between align-items-center p-3 px-4">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-trophy text-primary-spk"></i>
+          <span class="fw-bold" style="font-size: 0.92rem; color: var(--text-primary);">Top Peringkat Apartemen</span>
+        </div>
+        <a href="{{ url_for('hasil') }}" class="btn-spk btn-spk-outline btn-spk-sm" style="font-size: 0.75rem; border-radius: var(--radius-pill); padding: 4px 12px;">
+          Lihat Semua <i class="bi bi-arrow-right"></i>
+        </a>
+      </div>
+      <div class="table-responsive flex-grow-1" style="min-height: 180px;">
+        <table class="spk-table mb-0 align-middle">
+          <thead>
+            <tr>
+              <th style="width: 60px;">Rank</th>
+              <th>Nama Apartemen</th>
+              <th>Skor Preferensi (V<sub>i</sub>)</th>
+              <th style="text-align: right;">Status</th>
+            </tr>
+          </thead>
+          <tbody id="topRankingTableBody">
+            {% if results %}
+              {% for r in results[:5] %}
+              {% set is_top = r.peringkat == 1 %}
+              <tr style="{% if is_top %}background: rgba(240, 238, 255, 0.55);{% endif %}">
+                <td>
+                  {% if r.peringkat == 1 %}
+                    <span class="badge-rank badge-rank-1">🥇</span>
+                  {% elif r.peringkat == 2 %}
+                    <span class="badge-rank badge-rank-2">🥈</span>
+                  {% elif r.peringkat == 3 %}
+                    <span class="badge-rank badge-rank-3">🥉</span>
+                  {% else %}
+                    <span class="badge-rank badge-rank-n">#{{ r.peringkat }}</span>
+                  {% endif %}
+                </td>
+                <td class="fw-bold" style="color: var(--text-primary); font-size: 0.88rem;">{{ r.alternatif.nama_apartemen }}</td>
+                <td class="font-mono fw-bold" style="color: var(--primary); font-size: 0.92rem;">{{ "%.4f"|format(r.nilai_preferensi) }}</td>
+                <td style="text-align: right;">
+                  {% if is_top %}
+                    <span class="badge-spk badge-benefit"><i class="bi bi-star-fill me-1"></i>Peringkat #1</span>
+                  {% else %}
+                    <span class="badge-spk badge-primary">Terverifikasi</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="4" class="text-center py-4 text-muted">
+                  Data belum lengkap. Silakan isi kriteria dan alternatif.
+                </td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 3) Baris Bawah: 2 Kartu Mini Sejajar -->
+    <div class="row g-3">
+      <!-- Mini-card 1: Kelengkapan Matriks Keputusan -->
+      {% set total_cells = n_kriteria * n_alternatif %}
+      {% set fill_pct = ((n_nilai / total_cells) * 100)|round(1) if total_cells > 0 else 0 %}
+      <div class="col-md-6">
+        <div class="glass-card p-3 d-flex align-items-center gap-3">
+          <div class="kpi-icon flex-shrink-0" style="background: var(--accent-bg); color: var(--primary); width: 44px; height: 44px; font-size: 1.15rem; border-radius: 12px;">
+            <i class="bi bi-grid-3x3"></i>
+          </div>
+          <div class="flex-grow-1 min-w-0">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span class="fw-bold text-truncate" style="font-size: 0.82rem; color: var(--text-primary);">Kelengkapan Matriks Keputusan</span>
+              <span class="fw-bold font-mono" style="font-size: 0.78rem; color: var(--primary);">{{ n_nilai }}/{{ total_cells }}</span>
+            </div>
+            <div class="progress-spk" style="height: 6px;">
+              <div class="bar {% if fill_pct >= 100 %}valid{% endif %}" style="width: {{ [fill_pct, 100]|min }}%;"></div>
+            </div>
+            <div class="d-flex justify-content-between mt-1" style="font-size: 0.7rem; color: var(--text-muted);">
+              <span>{{ fill_pct }}% Parameter Terisi</span>
+              <span>Matriks 7 &times; 7</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mini-card 2: Riwayat Analisis Tersimpan -->
+      <div class="col-md-6">
+        <div class="glass-card p-3 d-flex align-items-center gap-3">
+          <div class="kpi-icon flex-shrink-0" style="background: rgba(254, 243, 199, 0.85); color: #D97706; width: 44px; height: 44px; font-size: 1.15rem; border-radius: 12px;">
+            <i class="bi bi-clock-history"></i>
+          </div>
+          <div class="flex-grow-1 min-w-0">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span class="fw-bold text-truncate" style="font-size: 0.82rem; color: var(--text-primary);">Riwayat Analisis Tersimpan</span>
+              <a href="{{ url_for('riwayat') }}" class="text-primary-spk fw-bold text-decoration-none" style="font-size: 0.74rem;">
+                Detail <i class="bi bi-arrow-right"></i>
+              </a>
+            </div>
+            <div class="progress-spk" style="height: 6px;">
+              <div class="bar" style="width: {{ [n_sesi * 20, 100]|min }}%; background: #D97706;"></div>
+            </div>
+            <div class="d-flex justify-content-between mt-1" style="font-size: 0.7rem; color: var(--text-muted);">
+              <span>{{ n_sesi }} Sesi Keputusan</span>
+              <span>Tersimpan di SQLite</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Three.js CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+  // =========================================================
+  // Helper: Dynamic SVG Sparkline ("Grafik Berjalan" + Pulse Dot)
+  // =========================================================
+  const sparklineStore = {};
+
+  function buildSmoothSvgPaths(values, width, height) {
+    const padLeft = 4;
+    const padRight = 10;
+    const padTop = 7;
+    const padBottom = 5;
+    const plotW = Math.max(40, width - padLeft - padRight);
+    const plotH = Math.max(12, height - padTop - padBottom);
+
+    let ptsInput = Array.isArray(values) && values.length ? values.map(v => Number(v) || 0) : [0, 0];
+    if (ptsInput.length === 1) {
+      ptsInput = [0, ptsInput[0]];
+    }
+
+    const minVal = Math.min(...ptsInput);
+    const maxVal = Math.max(...ptsInput);
+    const span = maxVal - minVal;
+
+    const pts = ptsInput.map((val, i) => {
+      const x = padLeft + (i / (ptsInput.length - 1)) * plotW;
+      const norm = span > 1e-9 ? (val - minVal) / span : 0.5;
+      const y = padTop + plotH - norm * plotH;
+      return { x, y };
+    });
+
+    const clampY = (y) => Math.max(padTop - 1, Math.min(height - padBottom + 1, y));
+
+    let dLine = `M ${pts[0].x.toFixed(2)} ${pts[0].y.toFixed(2)}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i - 1] || pts[i];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[i + 2] || p2;
+
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = clampY(p1.y + (p2.y - p0.y) / 6);
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = clampY(p2.y - (p3.y - p1.y) / 6);
+
+      dLine += ` C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)}, ${cp2x.toFixed(2)} ${cp2y.toFixed(2)}, ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
+    }
+
+    const lastPt = pts[pts.length - 1];
+    const firstPt = pts[0];
+    const dArea = `${dLine} L ${lastPt.x.toFixed(2)} ${height} L ${firstPt.x.toFixed(2)} ${height} Z`;
+
+    return { dLine, dArea, lastPt };
+  }
+
+  function renderSparklineSvg(svgId, dataPoints, color, animateDraw = true) {
+    const svg = document.getElementById(svgId);
+    if (!svg) return;
+
+    const rect = svg.parentElement ? svg.parentElement.getBoundingClientRect() : null;
+    const width = Math.round((rect && rect.width > 40 ? rect.width : svg.clientWidth) || 220);
+    const height = 36;
+
+    sparklineStore[svgId] = { dataPoints: [...dataPoints], color };
+
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    const gradId = `sparkGrad_${svgId}`;
+    const { dLine, dArea, lastPt } = buildSmoothSvgPaths(dataPoints, width, height);
+
+    svg.innerHTML = `
+      <defs>
+        <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${color}" stop-opacity="0.28" />
+          <stop offset="100%" stop-color="${color}" stop-opacity="0.01" />
+        </linearGradient>
+      </defs>
+      <path class="sparkline-area" d="${dArea}" fill="url(#${gradId})" />
+      <path class="sparkline-line" d="${dLine}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+      <g class="sparkline-dot-group">
+        <circle class="sparkline-dot-pulse" cx="${lastPt.x.toFixed(2)}" cy="${lastPt.y.toFixed(2)}" r="3.5" fill="none" stroke="${color}" stroke-width="1.6" />
+        <circle cx="${lastPt.x.toFixed(2)}" cy="${lastPt.y.toFixed(2)}" r="3.5" fill="${color}" stroke="#FFFFFF" stroke-width="1.4" style="filter: drop-shadow(0 0 5px ${color});" />
+      </g>
+    `;
+
+    const linePath = svg.querySelector('.sparkline-line');
+    const areaPath = svg.querySelector('.sparkline-area');
+    const dotGroup = svg.querySelector('.sparkline-dot-group');
+    if (!linePath) return;
+
+    const totalLen = Math.max(1, linePath.getTotalLength());
+
+    if (!animateDraw) {
+      linePath.style.transition = 'none';
+      linePath.style.strokeDasharray = 'none';
+      linePath.style.strokeDashoffset = '0';
+      if (areaPath) {
+        areaPath.style.transition = 'none';
+        areaPath.style.opacity = '1';
+      }
+      if (dotGroup) {
+        dotGroup.style.transition = 'none';
+        dotGroup.style.opacity = '1';
+      }
+      return;
+    }
+
+    // Initialize hidden stroke length, then draw smoothly left-to-right
+    linePath.style.transition = 'none';
+    linePath.style.strokeDasharray = `${totalLen} ${totalLen}`;
+    linePath.style.strokeDashoffset = `${totalLen}`;
+    linePath.getBoundingClientRect();
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        linePath.style.transition = 'stroke-dashoffset 1.2s cubic-bezier(0.22, 1, 0.36, 1)';
+        linePath.style.strokeDashoffset = '0';
+        if (areaPath) areaPath.style.opacity = '1';
+        if (dotGroup) dotGroup.style.opacity = '1';
+      });
+    });
+  }
+
+  // Keep SVG viewBox 1:1 on responsive resize without replaying draw animation
+  window.addEventListener('resize', () => {
+    Object.keys(sparklineStore).forEach(id => {
+      const cfg = sparklineStore[id];
+      if (cfg) renderSparklineSvg(id, cfg.dataPoints, cfg.color, false);
+    });
+  });
+
+  // =========================================================
+  // Actual Data from Jinja2 / SQLite for All 3 KPI Sparklines
+  // =========================================================
+  // 1) Kartu Rekomendasi #1: Preference scores sorted ascending toward #1
+  {% if results %}
+  let currentTopScores = [{% for r in results %}{{ "%.6f"|format(r.nilai_preferensi) }}{% if not loop.last %},{% endif %}{% endfor %}].reverse();
+  {% else %}
+  let currentTopScores = [0, 0];
+  {% endif %}
+  renderSparklineSvg('sparklineTop', currentTopScores, '#7C69EF', true);
+
+  // 2) Kartu Cakupan Data: Alternatives + Cost/Benefit criteria ratio
+  const nAltCount = {{ n_alternatif|int }};
+  const nKrtCount = {{ n_kriteria|int }};
+  const nNilaiCount = {{ n_nilai|int }};
+
+  function inferCostBenefitFromSaw(matrixX, matrixR, colMax, colMin) {
+    if (!matrixX || !matrixX.length || !matrixR || !matrixR.length) return null;
+    let cost = 0;
+    let benefit = 0;
+    const cols = matrixR[0].length;
+    for (let j = 0; j < cols; j++) {
+      let detected = null;
+      for (let i = 0; i < matrixX.length; i++) {
+        const x = Number(matrixX[i][j]);
+        const r = Number(matrixR[i][j]);
+        const cMax = Number(colMax[j]);
+        const cMin = Number(colMin[j]);
+        if (cMax > 0 && x > 0 && cMax !== cMin) {
+          const bDiff = Math.abs(r - (x / cMax));
+          const cDiff = Math.abs(r - (cMin / x));
+          detected = bDiff <= cDiff ? 'benefit' : 'cost';
+          break;
+        }
+      }
+      if (detected === 'cost') cost++;
+      else benefit++;
+    }
+    return { cost, benefit };
+  }
+
+  function buildCoverageSeries(altCount, krtCount, costCnt, benefitCnt, nilaiCnt) {
+    const safeTotalKrt = Math.max(1, costCnt + benefitCnt || krtCount);
+    const benefitRatio = benefitCnt / safeTotalKrt;
+    const avgCells = krtCount > 0 ? (nilaiCnt / krtCount) : altCount;
+    return [
+      costCnt,
+      benefitCnt,
+      krtCount,
+      altCount,
+      Number(avgCells.toFixed(2)),
+      Number((altCount + benefitRatio * Math.max(1, altCount * 0.4)).toFixed(2))
+    ];
+  }
+
+  // 3) Kartu Akurasi Bobot: Actual criteria weights & validity color
+  const totalBobotPct = {{ (total_bobot * 100)|round(2) }};
+  const isWeightValid = Math.abs(totalBobotPct - 100) < 0.01;
+  const weightColor = isWeightValid ? '#10B981' : '#F59E0B';
+
+  {% if saw and saw.bobot %}
+  const sawWeightsPct = [{% for w in saw.bobot %}{{ "%.2f"|format(w * 100) }}{% if not loop.last %},{% endif %}{% endfor %}];
+  const matrixXData = {{ saw.matrix_x|tojson }};
+  const matrixRData = {{ saw.matrix_r|tojson }};
+  const colMaxData = {{ saw.col_max|tojson }};
+  const colMinData = {{ saw.col_min|tojson }};
+  const cbCounts = inferCostBenefitFromSaw(matrixXData, matrixRData, colMaxData, colMinData) || { cost: 0, benefit: nKrtCount };
+
+  const cbSummaryEl = document.getElementById('costBenefitSummary');
+  if (cbSummaryEl) {
+    cbSummaryEl.innerHTML = `${cbCounts.cost} Kriteria Cost &bull; ${cbCounts.benefit} Kriteria Benefit`;
+  }
+
+  renderSparklineSvg(
+    'sparklineData',
+    buildCoverageSeries(nAltCount, nKrtCount, cbCounts.cost, cbCounts.benefit, nNilaiCount),
+    '#A799F7',
+    true
+  );
+  renderSparklineSvg('sparklineWeight', sawWeightsPct, weightColor, true);
+  {% else %}
+  // Fallback when matrix is incomplete: render initial points then sync exact criteria types & weights from /kriteria
+  renderSparklineSvg('sparklineData', [nKrtCount, nAltCount, nNilaiCount], '#A799F7', true);
+  renderSparklineSvg('sparklineWeight', [totalBobotPct, totalBobotPct], weightColor, true);
+
+  fetch('{{ url_for("kriteria_list") }}')
+    .then(r => r.text())
+    .then(htmlText => {
+      const doc = new DOMParser().parseFromString(htmlText, 'text/html');
+      const rows = doc.querySelectorAll('table.spk-table tbody tr');
+      let costCnt = 0;
+      let benefitCnt = 0;
+      const weights = [];
+      rows.forEach(tr => {
+        if (tr.querySelector('.badge-cost')) costCnt++;
+        else if (tr.querySelector('.badge-benefit')) benefitCnt++;
+        const cells = tr.querySelectorAll('td');
+        if (cells.length >= 5) {
+          const w = parseFloat(cells[4].textContent.trim());
+          if (!isNaN(w)) weights.push(Number((w * 100).toFixed(2)));
+        }
+      });
+      if (costCnt + benefitCnt > 0) {
+        const cbSummaryEl = document.getElementById('costBenefitSummary');
+        if (cbSummaryEl) cbSummaryEl.innerHTML = `${costCnt} Kriteria Cost &bull; ${benefitCnt} Kriteria Benefit`;
+        renderSparklineSvg('sparklineData', buildCoverageSeries(nAltCount, nKrtCount, costCnt, benefitCnt, nNilaiCount), '#A799F7', true);
+      }
+      if (weights.length > 0) {
+        renderSparklineSvg('sparklineWeight', weights, weightColor, true);
+      }
+    })
+    .catch(() => {});
+  {% endif %}
+
+  // Circular Ring / Doughnut Chart
+  let circChartInstance = null;
+  const circCanvas = document.getElementById('circularScoreChart');
+  function initOrUpdateCircularChart(pct) {
+    if (!circCanvas) return;
+    if (circChartInstance) {
+      circChartInstance.destroy();
+    }
+    circChartInstance = new Chart(circCanvas.getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        datasets: [{
+          data: [pct, Math.max(0, 100 - pct)],
+          backgroundColor: ['#7C69EF', 'rgba(226, 232, 240, 0.70)'],
+          borderWidth: 0,
+          borderRadius: 6
+        }]
+      },
+      options: {
+        cutout: '76%',
+        responsive: false,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { enabled: false } }
+      }
+    });
+  }
+
+  {% if top %}
+  initOrUpdateCircularChart({{ (top.nilai_preferensi * 100)|round(2) }});
+  {% endif %}
+
+  // =========================================================
+  // 1. Fetch SAW Results via /api/whatif (Real-time Sync)
+  // =========================================================
+  fetch('/api/whatif', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bobot: {} })
+  })
+  .then(r => {
+    if (!r.ok) throw new Error('API Error');
+    return r.json();
+  })
+  .then(data => {
+    if (data.error) throw new Error(data.error);
+    const results = data.results.sort((a, b) => a.peringkat - b.peringkat);
+    if (!results.length) return;
+
+    const top = results[0];
+
+    // Update Top Apartment Highlight
+    const topNameEl = document.getElementById('topApartmentName');
+    const topScoreEl = document.getElementById('topApartmentScore');
+    const bestFitEl = document.getElementById('bestFitApartmentName');
+    const circValEl = document.getElementById('circularScoreValue');
+
+    if (topNameEl) topNameEl.textContent = top.nama;
+    if (topScoreEl) topScoreEl.textContent = top.nilai.toFixed(4);
+    if (bestFitEl) bestFitEl.textContent = top.nama + ' (Peringkat #1)';
+    if (circValEl) circValEl.textContent = top.nilai.toFixed(2);
+
+    // Update Circular Doughnut Chart
+    initOrUpdateCircularChart(top.nilai * 100);
+
+    // Update Sparkline Top only if live preference scores changed
+    const scores = results.map(r => Number(r.nilai)).reverse();
+    const changed = scores.length !== currentTopScores.length ||
+      scores.some((val, idx) => Math.abs(val - currentTopScores[idx]) > 1e-5);
+    if (changed) {
+      currentTopScores = scores;
+      renderSparklineSvg('sparklineTop', scores, '#7C69EF', true);
+    }
+  })
+  .catch(err => {
+    // Keep server-rendered data intact on network or sync notice
+    console.debug('Real-time sync notice:', err);
+  });
+
+  // =========================================================
+  // 2. Interactive 3D Asset: Neural Apartment (Three.js)
+  // =========================================================
+  const container3D = document.getElementById('slot-3d-asset');
+  if (container3D && typeof THREE !== 'undefined') {
+    const width = container3D.clientWidth || 280;
+    const height = container3D.clientHeight || 300;
+
+    // Scene & Camera
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(44, width / height, 0.1, 100);
+    camera.position.set(0, 0.85, 6.8);
+
+    // Renderer (transparent background)
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    container3D.appendChild(renderer.domElement);
+
+    // Root Group
+    const worldGroup = new THREE.Group();
+    scene.add(worldGroup);
+
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.95);
+    scene.add(ambientLight);
+
+    const dirLight1 = new THREE.DirectionalLight(0xA799F7, 1.3);
+    dirLight1.position.set(6, 12, 8);
+    scene.add(dirLight1);
+
+    const dirLight2 = new THREE.DirectionalLight(0xFFFFFF, 0.7);
+    dirLight2.position.set(-6, -4, -6);
+    scene.add(dirLight2);
+
+    const coreLight = new THREE.PointLight(0x7C69EF, 2.0, 15);
+    coreLight.position.set(0, 1.5, 2);
+    scene.add(coreLight);
+
+    // Building Group
+    const buildingGroup = new THREE.Group();
+    buildingGroup.scale.set(1.3, 1.3, 1.3);
+    worldGroup.add(buildingGroup);
+
+    // Materials
+    const glassMaterial = new THREE.MeshStandardMaterial({
+      color: 0xF8F9FD,
+      roughness: 0.12,
+      metalness: 0.15,
+      transparent: true,
+      opacity: 0.78
+    });
+
+    const edgeMaterial = new THREE.LineBasicMaterial({
+      color: 0xA799F7,
+      transparent: true,
+      opacity: 0.95,
+      linewidth: 1.5
+    });
+
+    const floorDividerMaterial = new THREE.LineBasicMaterial({
+      color: 0x7C69EF,
+      transparent: true,
+      opacity: 0.45
+    });
+
+    const glowWindowMaterial = new THREE.MeshBasicMaterial({
+      color: 0xECE9FF,
+      transparent: true,
+      opacity: 0.85
+    });
+
+    function createTowerBlock(w, h, d, x, y, z, floorCount) {
+      const blockGroup = new THREE.Group();
+      blockGroup.position.set(x, y + h / 2, z);
+
+      const geom = new THREE.BoxGeometry(w, h, d);
+      const mesh = new THREE.Mesh(geom, glassMaterial);
+      blockGroup.add(mesh);
+
+      const edges = new THREE.EdgesGeometry(geom);
+      const wire = new THREE.LineSegments(edges, edgeMaterial);
+      blockGroup.add(wire);
+
+      if (floorCount > 1) {
+        for (let i = 1; i < floorCount; i++) {
+          const fy = -h / 2 + (h / floorCount) * i;
+          const floorGeom = new THREE.EdgesGeometry(new THREE.PlaneGeometry(w * 0.98, d * 0.98));
+          const floorLine = new THREE.LineSegments(floorGeom, floorDividerMaterial);
+          floorLine.rotation.x = Math.PI / 2;
+          floorLine.position.y = fy;
+          blockGroup.add(floorLine);
+
+          if (i % 2 === 0) {
+            const winGeom = new THREE.PlaneGeometry(w * 0.48, (h / floorCount) * 0.45);
+            const winFront = new THREE.Mesh(winGeom, glowWindowMaterial);
+            winFront.position.set(0, fy, d / 2 + 0.005);
+            blockGroup.add(winFront);
+          }
+        }
+      }
+      return blockGroup;
+    }
+
+    // Apartment Structures
+    const basePodium = createTowerBlock(3.0, 0.25, 2.5, 0, -1.6, 0, 1);
+    buildingGroup.add(basePodium);
+
+    const mainTower = createTowerBlock(1.4, 3.2, 1.35, 0, -1.35, 0, 8);
+    buildingGroup.add(mainTower);
+
+    const leftTier = createTowerBlock(0.95, 2.2, 1.05, -0.85, -1.35, 0.1, 5);
+    buildingGroup.add(leftTier);
+
+    const rightTier = createTowerBlock(0.85, 1.6, 0.95, 0.8, -1.35, -0.15, 4);
+    buildingGroup.add(rightTier);
+
+    const penthouseCrown = createTowerBlock(0.8, 0.65, 0.8, 0, 1.85, 0, 2);
+    buildingGroup.add(penthouseCrown);
+
+    const spireGeom = new THREE.CylinderGeometry(0.02, 0.04, 0.85, 8);
+    const spireMat = new THREE.MeshStandardMaterial({ color: 0xA799F7, metalness: 0.8, roughness: 0.2 });
+    const spire = new THREE.Mesh(spireGeom, spireMat);
+    spire.position.set(0, 2.9, 0);
+    buildingGroup.add(spire);
+
+    const beaconGeom = new THREE.SphereGeometry(0.08, 12, 12);
+    const beaconMat = new THREE.MeshBasicMaterial({ color: 0x7C69EF });
+    const beacon = new THREE.Mesh(beaconGeom, beaconMat);
+    beacon.position.set(0, 3.35, 0);
+    buildingGroup.add(beacon);
+
+    const ringGeom = new THREE.RingGeometry(2.1, 2.13, 48);
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0xD6D0FA, side: THREE.DoubleSide });
+    const groundRing = new THREE.Mesh(ringGeom, ringMat);
+    groundRing.rotation.x = Math.PI / 2;
+    groundRing.position.y = -1.6;
+    worldGroup.add(groundRing);
+
+    // 7 Neuron Nodes & Synaptic Connectors
+    const neuronGroup = new THREE.Group();
+    worldGroup.add(neuronGroup);
+
+    const nodeCount = 7;
+    const nodes = [];
+
+    const nodeSphereGeom = new THREE.SphereGeometry(0.13, 16, 16);
+    const nodeHaloGeom = new THREE.SphereGeometry(0.20, 16, 16);
+
+    const nodeCoreMat = new THREE.MeshStandardMaterial({
+      color: 0x7C69EF,
+      emissive: 0x7C69EF,
+      emissiveIntensity: 0.85,
+      roughness: 0.15,
+      metalness: 0.1
+    });
+
+    const nodeGlowHaloMat = new THREE.MeshBasicMaterial({
+      color: 0xA799F7,
+      transparent: true,
+      opacity: 0.38,
+      wireframe: true
+    });
+
+    const buildingAnchors = [
+      new THREE.Vector3(0, 3.2, 0),
+      new THREE.Vector3(0.38, 2.0, 0.38),
+      new THREE.Vector3(-0.85, 0.7, 0.45),
+      new THREE.Vector3(0.68, 0.25, 0.55),
+      new THREE.Vector3(-0.55, -0.4, -0.55),
+      new THREE.Vector3(0.8, 0.05, -0.2),
+      new THREE.Vector3(0, -0.75, 0.65)
+    ];
+
+    for (let i = 0; i < nodeCount; i++) {
+      const nodeMesh = new THREE.Mesh(nodeSphereGeom, nodeCoreMat);
+      const haloMesh = new THREE.Mesh(nodeHaloGeom, nodeGlowHaloMat);
+      nodeMesh.add(haloMesh);
+      neuronGroup.add(nodeMesh);
+
+      const lineGeom = new THREE.BufferGeometry().setFromPoints([
+        buildingAnchors[i],
+        new THREE.Vector3(0, 0, 0)
+      ]);
+      const lineMat = new THREE.LineBasicMaterial({
+        color: 0xA799F7,
+        transparent: true,
+        opacity: 0.55,
+        linewidth: 1.5
+      });
+      const connLine = new THREE.Line(lineGeom, lineMat);
+      worldGroup.add(connLine);
+
+      nodes.push({
+        mesh: nodeMesh,
+        angleOffset: (i * Math.PI * 2) / nodeCount,
+        baseRadius: 2.3 + (i % 3) * 0.35,
+        baseY: -0.9 + (i * 0.46),
+        speed: 0.45 + (i % 2) * 0.15,
+        anchor: buildingAnchors[i],
+        line: connLine
+      });
+    }
+
+    // Interactivity: Drag & Parallax & Floating Animation
+    let isDragging = false;
+    let prevMouseX = 0, prevMouseY = 0;
+    let targetRotationY = 0.45;
+    let targetRotationX = 0.15;
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const elapsedTime = clock.getElapsedTime();
+
+      if (!isDragging) {
+        targetRotationY += 0.005;
+      }
+
+      worldGroup.rotation.y += (targetRotationY - worldGroup.rotation.y) * 0.06;
+      worldGroup.rotation.x += (targetRotationX - worldGroup.rotation.x) * 0.06;
+
+      buildingGroup.position.y = Math.sin(elapsedTime * 1.3) * 0.06;
+
+      nodes.forEach((node, idx) => {
+        const theta = node.angleOffset + elapsedTime * node.speed * 0.65;
+        const currentRadius = node.baseRadius + Math.sin(elapsedTime * 1.6 + idx) * 0.16;
+        const x = Math.cos(theta) * currentRadius;
+        const z = Math.sin(theta) * currentRadius;
+        const y = node.baseY + Math.sin(elapsedTime * 2.2 + idx * 1.1) * 0.22;
+
+        node.mesh.position.set(x, y, z);
+
+        const posArray = node.line.geometry.attributes.position.array;
+        posArray[0] = node.anchor.x;
+        posArray[1] = node.anchor.y + buildingGroup.position.y;
+        posArray[2] = node.anchor.z;
+        posArray[3] = x;
+        posArray[4] = y;
+        posArray[5] = z;
+        node.line.geometry.attributes.position.needsUpdate = true;
+      });
+
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // Mouse drag
+    container3D.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      prevMouseX = e.clientX;
+      prevMouseY = e.clientY;
+      container3D.style.cursor = 'grabbing';
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        container3D.style.cursor = 'grab';
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (isDragging) {
+        const deltaX = e.clientX - prevMouseX;
+        const deltaY = e.clientY - prevMouseY;
+        prevMouseX = e.clientX;
+        prevMouseY = e.clientY;
+
+        targetRotationY += deltaX * 0.008;
+        targetRotationX += deltaY * 0.008;
+        targetRotationX = Math.max(-0.6, Math.min(0.8, targetRotationX));
+      }
+    });
+
+    // Parallax tilt
+    container3D.addEventListener('mousemove', (e) => {
+      if (!isDragging) {
+        const rect = container3D.getBoundingClientRect();
+        const normY = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
+        targetRotationX = 0.15 + normY * 0.12;
+      }
+    });
+
+    // Touch support
+    container3D.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) {
+        isDragging = true;
+        prevMouseX = e.touches[0].clientX;
+        prevMouseY = e.touches[0].clientY;
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchend', () => { isDragging = false; });
+
+    container3D.addEventListener('touchmove', (e) => {
+      if (isDragging && e.touches.length === 1) {
+        const deltaX = e.touches[0].clientX - prevMouseX;
+        const deltaY = e.touches[0].clientY - prevMouseY;
+        prevMouseX = e.touches[0].clientX;
+        prevMouseY = e.touches[0].clientY;
+        targetRotationY += deltaX * 0.008;
+        targetRotationX += deltaY * 0.008;
+        targetRotationX = Math.max(-0.6, Math.min(0.8, targetRotationX));
+      }
+    }, { passive: true });
+
+    // Resize observer
+    if (window.ResizeObserver) {
+      const resizeObserver = new ResizeObserver(() => {
+        const newWidth = container3D.clientWidth;
+        const newHeight = container3D.clientHeight;
+        if (newWidth > 0 && newHeight > 0) {
+          camera.aspect = newWidth / newHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(newWidth, newHeight);
+        }
+      });
+      resizeObserver.observe(container3D);
+    }
+  }
+});
+</script>
+{% endblock %}

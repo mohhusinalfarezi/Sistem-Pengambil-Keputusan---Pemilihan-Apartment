@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}Alternatif Apartemen – SPK Apartemen{% endblock %}
+
+{% block head_extra %}
+<style>
+  .glass-card::before, .glass-card::after, .card::before, .card::after {
+    pointer-events: none !important;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <h1><i class="bi bi-buildings me-2 text-primary-spk"></i>Alternatif Apartemen</h1>
+    <div class="subtitle">Data apartemen dan nilai matriks keputusan</div>
+  </div>
+  <a href="{{ url_for('alternatif_tambah') }}" class="btn-spk btn-spk-primary">
+    <i class="bi bi-plus-circle"></i> Tambah Apartemen
+  </a>
+</div>
+
+<div class="glass-card">
+  <div class="card-header-spk">
+    <i class="bi bi-table text-primary-spk"></i>
+    Daftar Apartemen ({{ alts | length }})
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="spk-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Nama Apartemen</th>
+          <th>Lokasi</th>
+          <th>Status</th>
+          {% for krt in kriterias %}
+          <th class="text-center" title="{{ krt.nama }}" style="font-size:.72rem;">
+            <div>{{ krt.kode }}</div>
+            <span class="badge-spk {% if krt.tipe=='benefit' %}badge-benefit{% else %}badge-cost{% endif %}" style="font-size:.6rem; padding:2px 6px;">
+              {{ krt.tipe[0]|upper }}
+            </span>
+          </th>
+          {% endfor %}
+          <th style="text-align:right;">Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for alt in alts %}
+        {% set filled, total_krt = completeness[alt.id] %}
+        <tr>
+          <td style="color:var(--text-muted); font-size:.78rem;">{{ loop.index }}</td>
+          <td style="font-weight:700;">{{ alt.nama_apartemen }}</td>
+          <td style="font-size:.8rem; color:var(--text-muted);">{{ alt.lokasi }}</td>
+          <td>
+            {% if filled == total_krt %}
+              <span class="badge-spk badge-benefit"><i class="bi bi-check-circle me-1"></i>{{ filled }}/{{ total_krt }}</span>
+            {% else %}
+              <span class="badge-spk badge-cost"><i class="bi bi-exclamation-circle me-1"></i>{{ filled }}/{{ total_krt }}</span>
+            {% endif %}
+          </td>
+          {% for krt in kriterias %}
+          <td class="text-center" style="font-family:monospace; font-size:.82rem;">
+            {% set val = nilai_map.get((alt.id, krt.id)) %}
+            {% set cur_val = val|int if val is not none else -1 %}
+
+            {% if krt.kode|upper == 'C3' %}
+              <select name="val_{{ alt.id }}_{{ krt.id }}" class="form-select form-select-sm" style="min-width: 210px; font-size: .8rem;">
+                <option value="" {% if val is none %}selected{% endif %} disabled>-- Pilih Skala Fasilitas --</option>
+                <option value="1" {% if cur_val == 1 %}selected{% endif %}>1 - Sangat Minim (Parkir terbatas, tanpa lift/kolam/gym)</option>
+                <option value="2" {% if cur_val == 2 %}selected{% endif %}>2 - Kurang Lengkap (Lift &amp; parkir standar saja)</option>
+                <option value="3" {% if cur_val == 3 %}selected{% endif %}>3 - Cukup Lengkap (Parkir, minimarket, 1 fasilitas utama)</option>
+                <option value="4" {% if cur_val == 4 %}selected{% endif %}>4 - Lengkap (Kolam renang, gym, parkir, semi-furnished)</option>
+                <option value="5" {% if cur_val == 5 %}selected{% endif %}>5 - Sangat Lengkap (Fasilitas premium lengkap &amp; full-furnished)</option>
+              </select>
+            {% elif krt.kode|upper == 'C5' %}
+              <select name="val_{{ alt.id }}_{{ krt.id }}" class="form-select form-select-sm" style="min-width: 210px; font-size: .8rem;">
+                <option value="" {% if val is none %}selected{% endif %} disabled>-- Pilih Skala Keamanan --</option>
+                <option value="1" {% if cur_val == 1 %}selected{% endif %}>1 - Sangat Rendah (Penjagaan minim, tanpa CCTV/akses)</option>
+                <option value="2" {% if cur_val == 2 %}selected{% endif %}>2 - Kurang Memadai (Sekuriti bergantian, CCTV terbatas)</option>
+                <option value="3" {% if cur_val == 3 %}selected{% endif %}>3 - Cukup Baik (Sekuriti 24 jam &amp; CCTV lobi utama)</option>
+                <option value="4" {% if cur_val == 4 %}selected{% endif %}>4 - Baik (Sekuriti 24 jam, CCTV tiap lantai &amp; access card)</option>
+                <option value="5" {% if cur_val == 5 %}selected{% endif %}>5 - Sangat Ketat (Keamanan berlapis, access card per lantai &amp; interkom)</option>
+              </select>
+            {% else %}
+              <input type="number" step="any" name="val_{{ alt.id }}_{{ krt.id }}"
+                     class="form-control form-control-sm text-center font-mono"
+                     value="{{ val if val is not none else '' }}"
+                     placeholder="-"
+                     style="width: 82px; min-width: 75px; margin: 0 auto; display: inline-block; font-size: .82rem;"/>
+            {% endif %}
+          </td>
+          {% endfor %}
+          <td style="text-align:right; white-space:nowrap;">
+            <a href="{{ url_for('alternatif_edit', aid=alt.id) }}"
+               class="btn-spk btn-spk-outline btn-spk-icon me-1" title="Edit">
+              <i class="bi bi-pencil"></i>
+            </a>
+            <form method="POST" action="{{ url_for('alternatif_hapus', aid=alt.id) }}"
+                  class="d-inline"
+                  onsubmit="return confirm('Hapus apartemen {{ alt.nama_apartemen }}?');">
+              <button type="submit" class="btn-spk btn-spk-danger btn-spk-icon" title="Hapus">
+                <i class="bi bi-trash3"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="{{ 5 + kriterias|length }}" class="text-center" style="padding:48px 0; color:var(--text-muted);">
+            <i class="bi bi-inbox" style="font-size:2.5rem; color:var(--border-light);"></i>
+            <div class="mt-2">Belum ada apartemen. <a href="{{ url_for('alternatif_tambah') }}" style="color:var(--primary); font-weight:600;">Tambah sekarang</a>.</div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="glass-card p-4 mt-4" style="position: relative; z-index: 50;">
+  <div class="d-flex justify-content-between align-items-center">
+    <h6 class="mb-0 fw-bold" style="color: #1E293B;">
+      <i class="bi bi-journal-text me-2" style="color: #7C69EF;"></i>
+      Panduan Rubrik Penilaian Skala 1–5 (C3 &amp; C5)
+    </h6>
+    <button type="button"
+            onclick="const box = document.getElementById('box-rubrik-c3-c5'); box.style.display = (box.style.display === 'none' || box.style.display === '') ? 'block' : 'none';"
+            style="background: #F0EEFF; color: #7C69EF; border: 1px solid #DDD6FE; border-radius: 999px; padding: 6px 16px; font-size: 0.85rem; font-weight: 600; cursor: pointer; position: relative; z-index: 60;">
+      Buka / Tutup Panduan <i class="bi bi-chevron-down ms-1"></i>
+    </button>
+  </div>
+
+  <div id="box-rubrik-c3-c5" style="display: none; margin-top: 1.25rem; border-top: 1px solid #EAECEF; padding-top: 1.25rem;">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="p-3 rounded-4" style="background: rgba(255,255,255,0.65); border: 1px solid #EAECEF;">
+          <h6 class="fw-bold mb-2" style="color: #7C69EF;">C3 — Fasilitas Gedung &amp; Unit (Benefit)</h6>
+          <ul class="small mb-0 ps-3" style="color: #475569; line-height: 1.7;">
+            <li><strong>Skor 1 (Sangat Minim):</strong> Parkir terbatas, tanpa lift memadai/kolam/gym, unit kosongan.</li>
+            <li><strong>Skor 2 (Kurang Lengkap):</strong> Lift dan area parkir standar, tanpa fasilitas olahraga/komersial.</li>
+            <li><strong>Skor 3 (Cukup Lengkap):</strong> Parkir memadai, minimarket/laundry, dan 1 fasilitas utama (kolam/gym).</li>
+            <li><strong>Skor 4 (Lengkap):</strong> Kolam renang, gym, area komersial, parkir memadai, unit semi-furnished.</li>
+            <li><strong>Skor 5 (Sangat Lengkap):</strong> Fasilitas premium lengkap (kolam, gym, lounge, basement) &amp; full-furnished.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="p-3 rounded-4" style="background: rgba(255,255,255,0.65); border: 1px solid #EAECEF;">
+          <h6 class="fw-bold mb-2" style="color: #7C69EF;">C5 — Tingkat Keamanan (Benefit)</h6>
+          <ul class="small mb-0 ps-3" style="color: #475569; line-height: 1.7;">
+            <li><strong>Skor 1 (Sangat Rendah):</strong> Penjagaan tidak 24 jam, tanpa CCTV aktif, akses masuk bebas.</li>
+            <li><strong>Skor 2 (Kurang Memadai):</strong> Petugas keamanan bergantian, CCTV terbatas, belum pakai access card.</li>
+            <li><strong>Skor 3 (Cukup Baik):</strong> Sekuriti 24 jam di gerbang utama &amp; CCTV lobi, akses lantai masih umum.</li>
+            <li><strong>Skor 4 (Baik):</strong> Sekuriti 24 jam, CCTV tiap lantai &amp; parkir, wajib access card masuk gedung/lift.</li>
+            <li><strong>Skor 5 (Sangat Ketat):</strong> Keamanan berlapis 24 jam, CCTV real-time, access card per lantai &amp; interkom.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

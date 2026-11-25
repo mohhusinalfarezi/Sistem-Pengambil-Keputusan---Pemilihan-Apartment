@@ -1,0 +1,1134 @@
+{% extends "base.html" %}
+{% block title %}Hasil SAW – SPK Apartemen{% endblock %}
+
+{% block head_extra %}
+<style>
+  /* ---- Node Map Container ---- */
+  #nodeMapContainer {
+    position: relative;
+    width: 100%;
+    height: 420px;
+    border-radius: var(--radius-card);
+    overflow: hidden;
+    background: linear-gradient(135deg, rgba(250, 250, 255, 0.7) 0%, rgba(244, 245, 250, 0.5) 50%, rgba(254, 247, 240, 0.5) 100%);
+    border: 1px solid var(--border-light);
+  }
+  #nodeMapSvg {
+    width: 100%;
+    height: 420px;
+    display: block;
+    user-select: none;
+  }
+
+  /* ---- SVG Node Styles ---- */
+  .svg-node-group {
+    transition: transform 0.2s cubic-bezier(.4,0,.2,1);
+  }
+  .svg-node-group:hover circle.node-main-circle {
+    stroke: #7C69EF !important;
+    stroke-width: 3px !important;
+  }
+  .svg-node-group:hover text.node-title {
+    fill: #7C69EF !important;
+  }
+  .active-node circle.node-main-circle {
+    stroke: #7C69EF !important;
+    stroke-width: 3.5px !important;
+    filter: drop-shadow(0 0 12px rgba(124, 105, 239, 0.55)) !important;
+  }
+  .active-node.node-rank-1 circle.node-main-circle {
+    stroke: #C4B5FD !important;
+    filter: drop-shadow(0 0 14px rgba(124, 105, 239, 0.7)) !important;
+  }
+  .active-node text.node-title {
+    fill: #7C69EF !important;
+  }
+  .active-path {
+    stroke: #A78BFA !important;
+    stroke-width: 4px !important;
+    stroke-opacity: 0.38 !important;
+    filter: drop-shadow(0 0 6px rgba(124, 105, 239, 0.28));
+  }
+
+  /* ---- Detail Panel (Slide-over) ---- */
+  .detail-panel {
+    position: absolute;
+    right: 0; top: 0;
+    width: 330px;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-left: 1px solid var(--border-light);
+    transform: translateX(100%);
+    transition: transform .32s cubic-bezier(.4,0,.2,1);
+    z-index: 10;
+    overflow-y: auto;
+    padding: 22px;
+    box-shadow: -6px 0 28px rgba(124, 105, 239, 0.10);
+  }
+  .detail-panel.active { transform: translateX(0); }
+  .detail-panel .close-btn {
+    position: absolute; top: 14px; right: 14px;
+    width: 28px; height: 28px; border-radius: 8px;
+    border: 1px solid var(--border-light); background: rgba(255, 255, 255, 0.8);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--text-muted); font-size: .84rem;
+    transition: all var(--transition);
+  }
+  .detail-panel .close-btn:hover { background: var(--cost-bg); color: var(--cost-color); }
+
+  /* Pointer events fix for overlays */
+  .glass-card::before, .glass-card::after, #nodeMapContainer::before, #nodeMapContainer::after {
+    pointer-events: none !important;
+  }
+
+  /* ---- Tabs ---- */
+  .spk-tabs {
+    display: inline-flex; gap: 6px;
+    padding: 6px; border-radius: 14px;
+    background: var(--accent-bg);
+    width: fit-content;
+    position: relative;
+    z-index: 20;
+    cursor: pointer;
+  }
+  .spk-tab-btn {
+    border: none; border-radius: 10px;
+    color: var(--text-muted); font-weight: 600;
+    padding: 8px 20px; font-size: .82rem;
+    transition: all var(--transition);
+    background: transparent;
+    cursor: pointer;
+    position: relative;
+    z-index: 20;
+    display: inline-flex;
+    align-items: center;
+    user-select: none;
+  }
+  .spk-tab-btn:hover { color: var(--primary); }
+  .spk-tab-btn.active {
+    background: var(--primary) !important;
+    color: #fff !important;
+    box-shadow: 0 4px 12px rgba(124,105,239,.28);
+  }
+
+  /* ---- Slider row ---- */
+  .slider-row {
+    padding: 10px 16px;
+    border-radius: 12px;
+    transition: background var(--transition);
+  }
+  .slider-row:hover { background: rgba(250, 250, 255, 0.8); }
+
+  /* ---- Matrix table ---- */
+  .matrix-cell {
+    font-family: monospace;
+    font-size: .8rem;
+    text-align: center;
+    white-space: nowrap;
+  }
+</style>
+<script>
+// Standalone Tab Switching - 100% pure vanilla JS, independent of external frameworks
+window.bukaTab = function(namaTab) {
+  var panels = {
+    'peringkat': document.getElementById('tab-peringkat'),
+    'matriks-x': document.getElementById('tab-matriks-x'),
+    'matriks-r': document.getElementById('tab-matriks-r')
+  };
+  var btns = {
+    'peringkat': document.getElementById('btn-tab-peringkat'),
+    'matriks-x': document.getElementById('btn-tab-matriks-x'),
+    'matriks-r': document.getElementById('btn-tab-matriks-r')
+  };
+
+  for (var key in panels) {
+    if (panels[key]) {
+      if (key === namaTab) {
+        panels[key].style.display = 'block';
+      } else {
+        panels[key].style.display = 'none';
+      }
+    }
+  }
+  for (var k in btns) {
+    if (btns[k]) {
+      if (k === namaTab) {
+        btns[k].classList.add('active');
+      } else {
+        btns[k].classList.remove('active');
+      }
+    }
+  }
+};
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <h1><i class="bi bi-graph-up-arrow me-2 text-primary-spk"></i>Hasil Perhitungan SAW</h1>
+    <div class="subtitle">Analisis, visualisasi, dan simulasi bobot keputusan</div>
+  </div>
+  {% if saw and saw.results %}
+  <div class="d-flex align-items-center gap-2 flex-wrap no-print">
+    <a href="{{ url_for('laporan') }}" class="btn-spk btn-spk-primary text-decoration-none">
+      <i class="bi bi-file-earmark-pdf"></i> Laporan &amp; PDF
+    </a>
+    <form method="POST" action="{{ url_for('simpan_hasil') }}" class="m-0">
+      <button type="submit" class="btn-spk btn-spk-success"
+              onclick="return confirm('Simpan riwayat hasil keputusan ini?');">
+        <i class="bi bi-floppy"></i> Simpan Riwayat
+      </button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ==================== ERRORS ==================== -->
+{% if errors %}
+<div class="glass-card mb-4" style="border:1.5px solid var(--cost-color);">
+  <div class="card-header-spk" style="color:var(--cost-color);">
+    <i class="bi bi-x-circle-fill"></i>
+    Data Belum Lengkap — Tidak Dapat Menghitung
+  </div>
+  <div class="card-pad">
+    <ul class="mb-0" style="font-size:.84rem;">
+      {% for e in errors %}
+      <li style="color:var(--cost-color); margin-bottom:4px;">{{ e }}</li>
+      {% endfor %}
+    </ul>
+    <div class="mt-3">
+      <a href="{{ url_for('alternatif_list') }}" class="btn-spk btn-spk-primary btn-spk-sm">
+        <i class="bi bi-pencil"></i> Lengkapi Data
+      </a>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if saw and saw.results %}
+{% set top = saw.results[0] %}
+
+<!-- ==================== WHAT-IF PANEL ==================== -->
+<div class="glass-card mb-4">
+  <div class="card-header-spk">
+    <i class="bi bi-sliders text-primary-spk"></i>
+    What-If Analysis — Simulasi Ubah Bobot
+    {% if whatif_active %}
+    <span class="badge-spk badge-primary ms-2">Simulasi Aktif</span>
+    {% endif %}
+  </div>
+  <div class="card-pad">
+    <p class="text-muted mb-3" style="font-size:.8rem;">
+      Geser slider untuk melihat bagaimana perubahan bobot memengaruhi peringkat secara real-time. Total bobot harus tepat 100%.
+    </p>
+
+    <div class="row g-2" id="sliderContainer">
+      {% for krt in kriterias %}
+      <div class="col-md-6 col-lg-4">
+        <div class="slider-row">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span style="font-size:.78rem; font-weight:600;">
+              <span class="badge-spk badge-primary me-1">{{ krt.kode }}</span>
+              {{ krt.nama }}
+            </span>
+            <span class="badge-spk {% if krt.tipe=='benefit' %}badge-benefit{% else %}badge-cost{% endif %}" style="font-size:.6rem;">
+              {{ krt.tipe[0]|upper }}
+            </span>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <input type="range" class="form-range sim-slider flex-grow-1"
+                   id="slider_{{ krt.id }}"
+                   min="0" max="1" step="0.01"
+                   value="{{ bobot_override[krt.id] if bobot_override and krt.id in bobot_override else krt.bobot }}"
+                   data-krt-id="{{ krt.id }}"
+                   oninput="updateSimulation()"/>
+            <input type="number" class="form-control sim-input"
+                   id="num_{{ krt.id }}"
+                   min="0" max="1" step="0.01"
+                   value="{{ bobot_override[krt.id] if bobot_override and krt.id in bobot_override else krt.bobot }}"
+                   style="width:68px; font-size:.8rem; padding:6px 8px;"
+                   oninput="syncSlider({{ krt.id }}); updateSimulation()"/>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Total bobot -->
+    <div class="mt-3 d-flex align-items-center gap-3 p-2 rounded-3" style="background:var(--accent-bg);">
+      <span style="font-size:.8rem; font-weight:700;">Total:</span>
+      <div class="progress-spk flex-grow-1" style="max-width:200px;">
+        <div class="bar" id="totalBobotBar"
+             style="width:{{ (saw.bobot|sum * 100)|round(2) }}%;"></div>
+      </div>
+      <span id="totalBobotTxt" class="font-mono" style="font-weight:800; font-size:.84rem; min-width:55px;">
+        {{ "%.2f"|format(saw.bobot|sum * 100) }}%
+      </span>
+    </div>
+
+    <!-- Hasil simulasi -->
+    <div class="mt-3" id="whatif-results">
+      <div style="font-size:.8rem; font-weight:700; color:var(--primary); margin-bottom:8px;">
+        <i class="bi bi-arrow-right-circle me-1"></i>Hasil Simulasi (Real-time)
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="spk-table" id="simTable">
+          <thead>
+            <tr>
+              <th>Peringkat</th>
+              <th>Nama Apartemen</th>
+              <th>Nilai Preferensi</th>
+            </tr>
+          </thead>
+          <tbody id="simTbody">
+            {% for r in saw.results %}
+            <tr class="rank-row {% if r.peringkat==1 %}rank-1{% endif %}"
+                {% if r.peringkat==1 %}style="background:var(--accent-bg);"{% endif %}>
+              <td>
+                {% if r.peringkat == 1 %}
+                  <span class="badge-rank badge-rank-1">#1</span>
+                {% else %}
+                  <span class="badge-rank badge-rank-n">#{{ r.peringkat }}</span>
+                {% endif %}
+              </td>
+              <td style="font-weight:600;">{{ r.alternatif.nama_apartemen }}</td>
+              <td class="font-mono" style="font-weight:600;">{{ "%.6f"|format(r.nilai_preferensi) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== INTERACTIVE DECISION NODE MAP (SVG MURNI) ==================== -->
+<div class="glass-card mb-4 overflow-hidden">
+  <div class="card-header-spk d-flex justify-content-between align-items-center">
+    <div class="d-flex align-items-center gap-2">
+      <i class="bi bi-diagram-3 text-primary-spk"></i>
+      <span class="fw-bold">Interactive Decision Node Map</span>
+    </div>
+    <span class="badge-spk badge-primary" style="font-size: 0.72rem;">
+      <i class="bi bi-cursor-fill me-1"></i>Klik Node untuk Detail Kontribusi
+    </span>
+  </div>
+  <div class="card-pad p-0 position-relative" style="overflow: hidden;">
+    <div id="nodeMapContainer">
+      <!-- Pure SVG Decision Graph Canvas -->
+      <svg id="nodeMapSvg" viewBox="0 0 860 420" preserveAspectRatio="xMidYMid meet">
+        <!-- Generated dynamically via Vanilla JS -->
+      </svg>
+
+      <!-- Slide-over Detail Panel -->
+      <div class="detail-panel" id="detailPanel">
+        <button type="button" class="close-btn" onclick="closeDetail()" title="Tutup Panel">✕</button>
+        <div id="detailContent">
+          <!-- Populated dynamically on node click -->
+        </div>
+        <div class="mt-3 pt-2 border-top">
+          <button type="button" class="btn-spk btn-spk-outline btn-spk-sm w-100 justify-content-center" onclick="bukaTab('matriks-x'); document.getElementById('matriksTabs').scrollIntoView({behavior:'smooth'});">
+            <i class="bi bi-table me-1"></i> Lihat Detail Matriks
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="text-center py-2" style="font-size:.72rem; color:var(--text-muted);">
+      Pilih node apartemen di atas untuk melihat rincian kontribusi seluruh kriteria keputusan (C1–C7)
+    </div>
+  </div>
+</div>
+
+<!-- ==================== GRAFIK PERBANDINGAN SKOR PREFERENSI (V_i) ==================== -->
+<div class="glass-card mb-4">
+  <div class="card-header-spk d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-bar-chart-steps text-primary-spk"></i>
+        <span class="fw-bold">Grafik Perbandingan Skor Preferensi (V_i)</span>
+      </div>
+      <div class="text-muted fw-normal mt-1" style="font-size: 0.76rem;">
+        Visualisasi perbandingan nilai akhir metode Simple Additive Weighting (SAW) dari peringkat tertinggi hingga terendah.
+      </div>
+    </div>
+    <div class="d-flex align-items-center gap-2 flex-wrap" style="font-size: 0.7rem;">
+      <span class="badge-spk" style="background: rgba(124, 105, 239, 0.14); color: #7C69EF;">
+        <span class="d-inline-block rounded-circle me-1" style="width:8px; height:8px; background:#7C69EF;"></span>Peringkat #1
+      </span>
+      <span class="badge-spk" style="background: rgba(167, 139, 250, 0.16); color: #6D28D9;">
+        <span class="d-inline-block rounded-circle me-1" style="width:8px; height:8px; background:#A78BFA;"></span>#2 &amp; #3
+      </span>
+      <span class="badge-spk" style="background: rgba(221, 214, 254, 0.45); color: #475569;">
+        <span class="d-inline-block rounded-circle me-1" style="width:8px; height:8px; background:#DDD6FE; border:1px solid #C4B5FD;"></span>#4+
+      </span>
+    </div>
+  </div>
+  <div class="card-pad">
+    <div id="rankingChartWrap" style="position: relative; width: 100%; height: {{ [240, (saw.results|length * 46)]|max }}px;">
+      <canvas id="sawRankingChart" aria-label="Grafik Perbandingan Skor Preferensi SAW"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== TABS: Peringkat / Matriks X / Matriks R ==================== -->
+<div class="glass-card" id="matriksTabs">
+  <div class="card-header-spk" style="flex-wrap:wrap; gap:12px;">
+    <div class="spk-tabs" role="tablist" style="position: relative; z-index: 20; cursor: pointer;">
+      <button type="button" id="btn-tab-peringkat" class="spk-tab-btn active" onclick="bukaTab('peringkat')">
+        <i class="bi bi-trophy me-1"></i>Peringkat
+      </button>
+      <button type="button" id="btn-tab-matriks-x" class="spk-tab-btn" onclick="bukaTab('matriks-x')">
+        <i class="bi bi-grid-3x3 me-1"></i>Matriks X
+      </button>
+      <button type="button" id="btn-tab-matriks-r" class="spk-tab-btn" onclick="bukaTab('matriks-r')">
+        <i class="bi bi-grid me-1"></i>Matriks R
+      </button>
+    </div>
+  </div>
+  <div class="card-pad tab-content">
+
+    <!-- Tab 1: Peringkat -->
+    <div id="tab-peringkat" style="display: block;">
+      <!-- Rekomendasi #1 -->
+      <div class="p-4 rounded-4 mb-4" style="background:linear-gradient(135deg,#FEF3C7,#FDE68A30); border:1px solid #FDE68A;">
+        <div class="d-flex align-items-center gap-4 flex-wrap">
+          <div class="text-center">
+            <div style="font-size:3rem;">🏆</div>
+            <span class="badge-rank badge-rank-1" style="width:auto; padding:4px 14px; font-size:.78rem;">#1 Terbaik</span>
+          </div>
+          <div class="flex-grow-1">
+            <div style="font-size:1.4rem; font-weight:800;">{{ top.alternatif.nama_apartemen }}</div>
+            <div class="text-muted" style="font-size:.84rem;"><i class="bi bi-geo-alt me-1"></i>{{ top.alternatif.lokasi }}</div>
+            <div class="text-muted mt-1" style="font-size:.78rem;">{{ top.alternatif.deskripsi }}</div>
+          </div>
+          <div class="text-center">
+            <div class="text-muted" style="font-size:.74rem;">Nilai Preferensi</div>
+            <div style="font-size:1.8rem; font-weight:800; color:var(--primary);">{{ "%.4f"|format(top.nilai_preferensi) }}</div>
+            <div class="progress-spk mt-1" style="width:100px;">
+              <div class="bar valid" style="width:{{ (top.nilai_preferensi * 100)|round(1) }}%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabel Peringkat -->
+      <div style="overflow-x:auto;">
+        <table class="spk-table">
+          <thead>
+            <tr>
+              <th>Peringkat</th>
+              <th>Nama Apartemen</th>
+              <th>Lokasi</th>
+              <th>Nilai Preferensi (V)</th>
+              <th>Visual</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in saw.results %}
+            <tr {% if r.peringkat == 1 %}style="background:var(--accent-bg);"{% endif %}>
+              <td>
+                {% if r.peringkat == 1 %}
+                  <span class="badge-rank badge-rank-1">🥇</span>
+                {% elif r.peringkat == 2 %}
+                  <span class="badge-rank badge-rank-2">🥈</span>
+                {% elif r.peringkat == 3 %}
+                  <span class="badge-rank badge-rank-3">🥉</span>
+                {% else %}
+                  <span class="badge-rank badge-rank-n">#{{ r.peringkat }}</span>
+                {% endif %}
+              </td>
+              <td style="font-weight:{% if r.peringkat==1 %}800{% else %}600{% endif %};">{{ r.alternatif.nama_apartemen }}</td>
+              <td style="font-size:.8rem; color:var(--text-muted);">{{ r.alternatif.lokasi }}</td>
+              <td class="font-mono" style="font-weight:700;">{{ "%.6f"|format(r.nilai_preferensi) }}</td>
+              <td style="min-width:140px;">
+                <div class="progress-spk">
+                  <div class="bar {% if r.peringkat==1 %}valid{% endif %}" style="width:{{ (r.nilai_preferensi * 100)|round(2) }}%;"></div>
+                </div>
+                <div style="font-size:.68rem; color:var(--text-muted); margin-top:2px;">{{ (r.nilai_preferensi * 100)|round(2) }}%</div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 2: Matriks X -->
+    <div id="tab-matriks-x" style="display: none;">
+      <div class="mb-3 p-3 rounded-3" style="background:var(--accent-bg); font-size:.8rem; color:var(--text-muted);">
+        <strong>Matriks Keputusan Awal (X)</strong> — Nilai asli setiap alternatif untuk setiap kriteria.
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="spk-table">
+          <thead>
+            <tr>
+              <th>Alternatif</th>
+              {% for krt in kriterias %}
+              <th class="text-center" style="font-size:.74rem;">
+                {{ krt.kode }}<br>
+                <span class="badge-spk {% if krt.tipe=='benefit' %}badge-benefit{% else %}badge-cost{% endif %}" style="font-size:.58rem; padding:2px 6px;">
+                  {{ krt.tipe[0]|upper }}
+                </span>
+              </th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in saw.results %}
+            <tr>
+              <td style="font-weight:600;">{{ r.alternatif.nama_apartemen }}</td>
+              {% for v in r.matrix_x_row %}
+              <td class="matrix-cell">{{ v }}</td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td style="font-weight:700;">Max / Min</td>
+              {% for j in range(kriterias|length) %}
+              <td class="matrix-cell" style="font-weight:800; color:var(--primary);">
+                {% if kriterias[j].tipe == 'benefit' %}
+                  {{ saw.col_max[j] }}
+                {% else %}
+                  {{ saw.col_min[j] }}
+                {% endif %}
+              </td>
+              {% endfor %}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 3: Matriks R -->
+    <div id="tab-matriks-r" style="display: none;">
+      <div class="mb-3 p-3 rounded-3" style="background:var(--accent-bg); font-size:.8rem; color:var(--text-muted);">
+        <strong>Matriks Normalisasi (R)</strong> —
+        BENEFIT: R<sub>ij</sub> = X<sub>ij</sub> / max(X<sub>*j</sub>) &nbsp;|&nbsp;
+        COST: R<sub>ij</sub> = min(X<sub>*j</sub>) / X<sub>ij</sub>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="spk-table">
+          <thead>
+            <tr>
+              <th>Alternatif</th>
+              {% for krt in kriterias %}
+              <th class="text-center" style="font-size:.74rem;">
+                {{ krt.kode }}<br>
+                <span class="badge-spk badge-primary" style="font-size:.58rem; padding:2px 6px;">
+                  w={{ "%.2f"|format(krt.bobot) }}
+                </span>
+              </th>
+              {% endfor %}
+              <th class="text-center">V = Σw·R</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in saw.results %}
+            <tr {% if r.peringkat==1 %}style="background:var(--accent-bg);"{% endif %}>
+              <td style="font-weight:600;">{{ r.alternatif.nama_apartemen }}</td>
+              {% for v in r.matrix_r_row %}
+              <td class="matrix-cell">{{ "%.4f"|format(v) }}</td>
+              {% endfor %}
+              <td class="matrix-cell" style="font-weight:800; color:var(--primary);">
+                {{ "%.4f"|format(r.nilai_preferensi) }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td style="font-weight:700;">Bobot (w)</td>
+              {% for w in saw.bobot %}
+              <td class="matrix-cell" style="font-weight:800;">{{ "%.2f"|format(w) }}</td>
+              {% endfor %}
+              <td class="matrix-cell" style="font-weight:800;">{{ "%.2f"|format(saw.bobot|sum) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endif %} {# end if saw.results #}
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% if saw and saw.results %}
+// =========================================================
+// 1. DATA FROM JINJA2 (SAFE JSON PARSING)
+// =========================================================
+const kriteriaIds = [{% for krt in kriterias %}{{ krt.id }}{% if not loop.last %},{% endif %}{% endfor %}];
+
+const kriteriaData = [
+  {% for krt in kriterias %}
+  { id: {{ krt.id }}, kode: {{ krt.kode|tojson }}, nama: {{ krt.nama|tojson }}, tipe: {{ krt.tipe|tojson }}, bobot: {{ krt.bobot }} }{% if not loop.last %},{% endif %}
+  {% endfor %}
+];
+
+let sawResults = [
+  {% for r in saw.results %}
+  {
+    id: {{ r.alternatif.id }},
+    nama: {{ r.alternatif.nama_apartemen|tojson }},
+    lokasi: {{ r.alternatif.lokasi|tojson }},
+    deskripsi: {{ (r.alternatif.deskripsi or '')|tojson }},
+    peringkat: {{ r.peringkat }},
+    skor: {{ r.nilai_preferensi }},
+    matrix_r: [{% for v in r.matrix_r_row %}{{ v }}{% if not loop.last %},{% endif %}{% endfor %}],
+    matrix_x: [{% for v in r.matrix_x_row %}{{ v }}{% if not loop.last %},{% endif %}{% endfor %}]
+  }{% if not loop.last %},{% endif %}
+  {% endfor %}
+];
+
+let currentBobot = [{% for w in saw.bobot %}{{ w }}{% if not loop.last %},{% endif %}{% endfor %}];
+let activeApartmentId = null;
+let nodePathsMap = {};
+
+// =========================================================
+// 2. WHAT-IF SLIDERS CONTROLLER
+// =========================================================
+function getBobot() {
+  const b = {};
+  kriteriaIds.forEach(id => {
+    const el = document.getElementById('num_' + id);
+    b[id] = parseFloat(el ? el.value || 0 : 0);
+  });
+  return b;
+}
+
+function syncSlider(id) {
+  const num = document.getElementById('num_' + id);
+  const sl  = document.getElementById('slider_' + id);
+  if (num && sl) sl.value = num.value;
+}
+
+function syncNum(id) {
+  const num = document.getElementById('num_' + id);
+  const sl  = document.getElementById('slider_' + id);
+  if (num && sl) num.value = sl.value;
+}
+
+document.querySelectorAll('.sim-slider').forEach(sl => {
+  sl.addEventListener('input', () => syncNum(sl.dataset.krtId));
+});
+
+let debounceTimer = null;
+function updateSimulation() {
+  const bobot = getBobot();
+  const total = Object.values(bobot).reduce((a, b) => a + b, 0);
+
+  const bar = document.getElementById('totalBobotBar');
+  const txt = document.getElementById('totalBobotTxt');
+  const pct = Math.min(total * 100, 100);
+  if (bar) {
+    bar.style.width = pct + '%';
+    bar.className = 'bar ' + (Math.abs(total - 1) < 0.001 ? 'valid' : 'invalid');
+  }
+  if (txt) {
+    txt.textContent = (total * 100).toFixed(2) + '%';
+  }
+
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    if (Math.abs(total - 1) > 0.001) return;
+
+    fetch('/api/whatif', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bobot })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) return;
+
+      // 1. Update What-if table
+      const tbody = document.getElementById('simTbody');
+      if (tbody) {
+        tbody.innerHTML = '';
+        data.results.forEach(r => {
+          const isTop = r.peringkat === 1;
+          tbody.innerHTML += `
+            <tr class="rank-row ${isTop ? 'rank-1' : ''}" ${isTop ? 'style="background:var(--accent-bg);"' : ''}>
+              <td><span class="badge-rank ${isTop ? 'badge-rank-1' : 'badge-rank-n'}">${isTop ? '#1' : '#' + r.peringkat}</span></td>
+              <td style="font-weight:600;">${r.nama}</td>
+              <td class="font-mono" style="font-weight:600;">${r.nilai.toFixed(6)}</td>
+            </tr>`;
+        });
+      }
+
+      // 2. Update active weights
+      kriteriaIds.forEach((id, j) => {
+        currentBobot[j] = bobot[id] !== undefined ? bobot[id] : kriteriaData[j].bobot;
+      });
+
+      // 3. Update sawResults array
+      data.results.forEach(res => {
+        const item = sawResults.find(a => a.nama === res.nama);
+        if (item) {
+          item.peringkat = res.peringkat;
+          item.skor = res.nilai;
+        }
+      });
+      sawResults.sort((a, b) => a.peringkat - b.peringkat);
+
+      // 4. Re-render SVG node map & ranking bar chart
+      renderSvgNodeMap();
+      renderRankingBarChart();
+
+      // 5. Update detail panel if open
+      if (activeApartmentId !== null) {
+        showDetail(activeApartmentId);
+      }
+    })
+    .catch(console.error);
+  }, 300);
+}
+
+// =========================================================
+// 3. PURE SVG + VANILLA JS INTERACTIVE NODE MAP
+// =========================================================
+function renderSvgNodeMap() {
+  const svg = document.getElementById('nodeMapSvg');
+  if (!svg) return;
+
+  const count = sawResults.length;
+  if (count === 0) return;
+
+  // Center node coordinate
+  const centerX = 135;
+  const centerY = 210;
+
+  let pathsHtml = '';
+  let nodesHtml = '';
+  nodePathsMap = {};
+
+  const targetActiveId = activeApartmentId !== null
+    ? activeApartmentId
+    : (sawResults[0] ? sawResults[0].id : null);
+
+  sawResults.forEach((r, i) => {
+    // S-curve distribution on right side
+    const targetY = 40 + i * (340 / Math.max(1, count - 1));
+    const arcBulge = Math.sin((i / Math.max(1, count - 1)) * Math.PI) * 45;
+    const targetX = 430 + arcBulge;
+
+    const isTop = r.peringkat === 1;
+    const isActive = targetActiveId === r.id;
+    const nodeR = isTop ? 21 : 17;
+    const orbitR = isTop ? 28 : 24;
+
+    // Bezier control points for smooth horizontal S-curve
+    const cp1x = centerX + (targetX - centerX) * 0.45;
+    const cp1y = centerY;
+    const cp2x = centerX + (targetX - centerX) * 0.55;
+    const cp2y = targetY;
+
+    const dPath = `M ${centerX + 44} ${centerY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${targetX - (nodeR + 2)} ${targetY}`;
+    nodePathsMap[r.id] = dPath;
+
+    // S-curve connector
+    pathsHtml += `
+      <path id="curve-${r.id}" class="node-path ${isTop ? 'path-rank-1' : ''} ${isActive ? 'active-path' : ''}"
+            d="${dPath}"
+            fill="none"
+            stroke="${isTop ? '#7C69EF' : '#C7D2FE'}"
+            stroke-width="${isTop ? '2.5' : '1.8'}"
+            stroke-opacity="${isTop ? '0.85' : '0.65'}"
+            stroke-linecap="round" />
+    `;
+
+    // Apartment Node Group
+    const nodeCircleFill = isTop ? 'url(#rank1Grad)' : '#FFFFFF';
+    const nodeCircleStroke = isTop ? '#A799F7' : '#C7D2FE';
+    const rankTextColor = isTop ? '#FFFFFF' : '#475569';
+
+    nodesHtml += `
+      <g class="svg-node-group ${isTop ? 'node-rank-1' : ''} ${isActive ? 'active-node' : ''}"
+         id="svg-node-${r.id}"
+         data-id="${r.id}"
+         transform="translate(${targetX}, ${targetY})"
+         onclick="showDetail(${r.id})"
+         style="cursor: pointer;">
+        
+        <!-- Large hover & click hit area -->
+        <rect x="-28" y="-26" width="272" height="52" fill="transparent" />
+
+        <!-- Active Node Pulse Rings & Floating Micro-Dots -->
+        <g class="active-node-effects">
+          <circle class="neuron-pulse-ring" cx="0" cy="0" r="${nodeR}" />
+          <circle class="neuron-pulse-ring delay-1" cx="0" cy="0" r="${nodeR}" />
+          <g class="micro-dots-orbit">
+            <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="14s" repeatCount="indefinite" />
+            <circle class="micro-dot micro-dot-1" cx="0" cy="${-orbitR}" r="2.4" fill="#7C69EF" />
+            <circle class="micro-dot micro-dot-2" cx="${orbitR}" cy="0" r="2.1" fill="#A78BFA" />
+            <circle class="micro-dot micro-dot-3" cx="0" cy="${orbitR}" r="2.4" fill="#7C69EF" />
+            <circle class="micro-dot micro-dot-4" cx="${-orbitR}" cy="0" r="2.1" fill="#A78BFA" />
+          </g>
+        </g>
+
+        <!-- Node Circle with Rank badge -->
+        <circle class="node-main-circle" r="${nodeR}" fill="${nodeCircleFill}" stroke="${nodeCircleStroke}" stroke-width="${isTop ? '2.5' : '2'}" filter="url(#nodeShadow)"/>
+        <text y="${isTop ? '5' : '4'}" text-anchor="middle" fill="${rankTextColor}" font-size="${isTop ? '12' : '10.5'}" font-weight="800" font-family="'Plus Jakarta Sans', sans-serif">
+          #${r.peringkat}
+        </text>
+
+        <!-- Apartment Name -->
+        <text class="node-title" x="28" y="-3" fill="#1E293B" font-size="12.5" font-weight="${isTop ? '800' : '700'}" font-family="'Plus Jakarta Sans', sans-serif">
+          ${r.nama}
+        </text>
+
+        <!-- Final Score V_i -->
+        <text x="28" y="14" fill="${isTop ? '#7C69EF' : '#64748B'}" font-size="11" font-weight="700" font-family="monospace">
+          V = ${r.skor.toFixed(4)}
+        </text>
+      </g>
+    `;
+  });
+
+  svg.innerHTML = `
+    <defs>
+      <!-- Center Node Gradient -->
+      <linearGradient id="centerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#8B78F6" />
+        <stop offset="100%" stop-color="#6B58DE" />
+      </linearGradient>
+
+      <!-- Rank 1 Gradient -->
+      <linearGradient id="rank1Grad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#7C69EF" />
+        <stop offset="100%" stop-color="#5B48D9" />
+      </linearGradient>
+
+      <!-- Drop Shadows -->
+      <filter id="nodeShadow" x="-30%" y="-30%" width="160%" height="160%">
+        <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#7C69EF" flood-opacity="0.2"/>
+      </filter>
+      <filter id="centerGlow" x="-30%" y="-30%" width="160%" height="160%">
+        <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#7C69EF" flood-opacity="0.3"/>
+      </filter>
+    </defs>
+
+    <!-- Background decorative guide arcs -->
+    <circle cx="${centerX}" cy="${centerY}" r="170" fill="none" stroke="#DDD6FE" stroke-width="1" stroke-dasharray="3 6" opacity="0.5" />
+    <circle cx="${centerX}" cy="${centerY}" r="310" fill="none" stroke="#DDD6FE" stroke-width="1" stroke-dasharray="3 6" opacity="0.35" />
+
+    <!-- Connecting S-Curves -->
+    <g id="pathsGroup">${pathsHtml}</g>
+
+    <!-- Active Neuron Impulse Flow Overlay & Moving Particles -->
+    <g id="activeFlowLayer"></g>
+
+    <!-- Center Node ("Rekomendasi SAW") -->
+    <g id="centerNodeGroup" transform="translate(${centerX}, ${centerY})" style="cursor: default;">
+      <!-- Outer rotating dashed ring -->
+      <circle r="52" fill="none" stroke="#A799F7" stroke-width="1.8" stroke-dasharray="4 4" opacity="0.75">
+        <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="24s" repeatCount="indefinite"/>
+      </circle>
+      <!-- Center Circle Body -->
+      <circle r="44" fill="url(#centerGrad)" stroke="#FFFFFF" stroke-width="3" filter="url(#centerGlow)"/>
+      <text y="-5" text-anchor="middle" fill="#FFFFFF" font-size="11.5" font-weight="800" font-family="'Plus Jakarta Sans', sans-serif">
+        Rekomendasi
+      </text>
+      <text y="14" text-anchor="middle" fill="#FFFFFF" font-size="13" font-weight="800" font-family="'Plus Jakarta Sans', sans-serif">
+        SAW
+      </text>
+    </g>
+
+    <!-- Apartment Node Groups -->
+    <g id="nodesGroup">${nodesHtml}</g>
+  `;
+
+  if (targetActiveId !== null) {
+    applyActiveNodeVisuals(targetActiveId);
+  }
+}
+
+function applyActiveNodeVisuals(targetId) {
+  document.querySelectorAll('.svg-node-group').forEach(el => el.classList.remove('active-node'));
+  document.querySelectorAll('.node-path').forEach(el => el.classList.remove('active-path'));
+
+  const flowLayer = document.getElementById('activeFlowLayer');
+  if (flowLayer) flowLayer.innerHTML = '';
+
+  if (targetId === null || targetId === undefined) return;
+
+  const activeGroup = document.getElementById('svg-node-' + targetId);
+  const activePath = document.getElementById('curve-' + targetId);
+  if (activeGroup) activeGroup.classList.add('active-node');
+  if (activePath) activePath.classList.add('active-path');
+
+  const dPath = nodePathsMap[targetId];
+  if (flowLayer && dPath) {
+    flowLayer.innerHTML = `
+      <path class="neuron-flow-overlay" d="${dPath}" />
+      <circle class="neuron-impulse-dot" r="3.5" fill="#7C69EF" opacity="0">
+        <animateMotion dur="1.8s" begin="0s" repeatCount="indefinite" calcMode="paced" path="${dPath}" />
+        <animate attributeName="opacity" values="0;1;1;0.15" keyTimes="0;0.08;0.92;1" dur="1.8s" begin="0s" repeatCount="indefinite" />
+      </circle>
+      <circle class="neuron-impulse-dot" r="3.5" fill="#7C69EF" opacity="0">
+        <animateMotion dur="1.8s" begin="0.6s" repeatCount="indefinite" calcMode="paced" path="${dPath}" />
+        <animate attributeName="opacity" values="0;1;1;0.15" keyTimes="0;0.08;0.92;1" dur="1.8s" begin="0.6s" repeatCount="indefinite" />
+      </circle>
+      <circle class="neuron-impulse-dot" r="3.5" fill="#7C69EF" opacity="0">
+        <animateMotion dur="1.8s" begin="1.2s" repeatCount="indefinite" calcMode="paced" path="${dPath}" />
+        <animate attributeName="opacity" values="0;1;1;0.15" keyTimes="0;0.08;0.92;1" dur="1.8s" begin="1.2s" repeatCount="indefinite" />
+      </circle>
+    `;
+  }
+}
+
+// =========================================================
+// 4. DETAIL PANEL CONTROLLER (CRITERIA BREAKDOWN C1-C7)
+// =========================================================
+function showDetail(id) {
+  activeApartmentId = id;
+  const d = sawResults.find(a => a.id === id);
+  if (!d) return;
+
+  // Highlight active node, neuron path flow, and particle effects
+  applyActiveNodeVisuals(id);
+
+  const panel = document.getElementById('detailPanel');
+  const content = document.getElementById('detailContent');
+
+  // Compute criteria contribution for all 7 criteria (w_j * r_ij)
+  const contributions = kriteriaData.map((krt, j) => {
+    const r_val = d.matrix_r[j] || 0;
+    const w_val = currentBobot[j] !== undefined ? currentBobot[j] : (krt.bobot || 0);
+    const contr = r_val * w_val;
+    return {
+      kode: krt.kode,
+      nama: krt.nama,
+      tipe: krt.tipe,
+      r_val: r_val,
+      w_val: w_val,
+      contribution: contr,
+      pct: w_val > 0 ? Math.min(100, Math.round((contr / w_val) * 100)) : 0
+    };
+  });
+
+  const rankBadgeClass = d.peringkat === 1 ? 'badge-rank-1' : (d.peringkat === 2 ? 'badge-rank-2' : (d.peringkat === 3 ? 'badge-rank-3' : 'badge-rank-n'));
+
+  let criteriaRows = '';
+  contributions.forEach(c => {
+    criteriaRows += `
+      <div class="mb-2 pb-1 border-bottom" style="border-color: rgba(226, 232, 240, 0.6) !important;">
+        <div class="d-flex justify-content-between align-items-center mb-1" style="font-size: 0.74rem;">
+          <span class="fw-semibold text-truncate" style="max-width: 175px;">
+            <span class="badge-spk ${c.tipe === 'benefit' ? 'badge-benefit' : 'badge-cost'} me-1" style="font-size: 0.6rem; padding: 2px 5px;">${c.kode}</span>
+            ${c.nama}
+          </span>
+          <span class="font-mono fw-bold" style="color: var(--primary);">+${c.contribution.toFixed(4)}</span>
+        </div>
+        <div class="progress-spk" style="height: 6px;">
+          <div class="bar" style="width: ${c.pct}%; background: ${c.tipe === 'benefit' ? '#7C69EF' : '#A799F7'};"></div>
+        </div>
+        <div class="d-flex justify-content-between text-muted mt-1" style="font-size: 0.65rem;">
+          <span>r=${c.r_val.toFixed(2)} &times; w=${c.w_val.toFixed(2)}</span>
+          <span class="fw-semibold">${c.pct}% kontribusi</span>
+        </div>
+      </div>
+    `;
+  });
+
+  content.innerHTML = `
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <span class="badge-rank ${rankBadgeClass}" style="width: auto; padding: 4px 10px; font-size: 0.76rem;">
+        #${d.peringkat} Peringkat
+      </span>
+      ${d.peringkat === 1 ? '<span class="badge-spk badge-benefit" style="font-size: 0.68rem;">Rekomendasi Utama</span>' : ''}
+    </div>
+    <h5 class="fw-bold mb-1" style="color: var(--text-primary); font-size: 1.15rem;">${d.nama}</h5>
+    <div class="text-muted small mb-1" style="font-size: 0.76rem;">
+      <i class="bi bi-geo-alt me-1 text-primary-spk"></i>${d.lokasi}
+    </div>
+    ${d.deskripsi ? `<div class="text-muted small mb-2" style="font-size: 0.72rem; line-height: 1.35;">${d.deskripsi}</div>` : ''}
+
+    <div class="p-2 rounded-3 text-center mb-3" style="background: var(--accent-bg); border: 1px solid rgba(124, 105, 239, 0.2);">
+      <div class="text-muted" style="font-size: 0.68rem; text-transform: uppercase; font-weight: 600;">Skor Preferensi Akhir (V)</div>
+      <div class="fw-extrabold font-mono" style="font-size: 1.45rem; color: var(--primary);">${d.skor.toFixed(4)}</div>
+    </div>
+
+    <div class="fw-bold mb-2" style="font-size: 0.78rem; color: var(--text-primary);">
+      <i class="bi bi-pie-chart me-1 text-primary-spk"></i>Kontribusi 7 Kriteria (w<sub>j</sub> &times; r<sub>ij</sub>)
+    </div>
+    <div style="max-height: 220px; overflow-y: auto; padding-right: 4px;">
+      ${criteriaRows}
+    </div>
+  `;
+
+  panel.classList.add('active');
+}
+
+function closeDetail() {
+  activeApartmentId = null;
+  const panel = document.getElementById('detailPanel');
+  if (panel) panel.classList.remove('active');
+  const defaultId = sawResults.length > 0 ? sawResults[0].id : null;
+  applyActiveNodeVisuals(defaultId);
+}
+
+// =========================================================
+// 5. HORIZONTAL BAR CHART (CHART.JS) — SKOR PREFERENSI (V_i)
+// =========================================================
+let rankingBarChart = null;
+let rankingChartItems = [];
+
+function renderRankingBarChart() {
+  const canvas = document.getElementById('sawRankingChart');
+  if (!canvas || typeof Chart === 'undefined') return;
+
+  rankingChartItems = [...sawResults].sort((a, b) => a.peringkat - b.peringkat);
+  const labels = rankingChartItems.map(r => `#${r.peringkat} ${r.nama}`);
+  const values = rankingChartItems.map(r => Number(r.skor.toFixed(6)));
+
+  const wrap = document.getElementById('rankingChartWrap');
+  if (wrap) {
+    wrap.style.height = Math.max(240, rankingChartItems.length * 46) + 'px';
+  }
+
+  const getBarColor = (ctx) => {
+    const item = rankingChartItems[ctx.dataIndex];
+    if (!item) return '#DDD6FE';
+    if (item.peringkat === 1) {
+      const { ctx: c, chartArea } = ctx.chart;
+      if (!chartArea) return '#7C69EF';
+      const grad = c.createLinearGradient(chartArea.left, 0, chartArea.right, 0);
+      grad.addColorStop(0, '#9B8AFB');
+      grad.addColorStop(1, '#7C69EF');
+      return grad;
+    }
+    if (item.peringkat === 2 || item.peringkat === 3) return '#A78BFA';
+    return '#DDD6FE';
+  };
+
+  const getBarBorderColor = (ctx) => {
+    const item = rankingChartItems[ctx.dataIndex];
+    if (!item) return '#C4B5FD';
+    if (item.peringkat === 1) return '#7C69EF';
+    if (item.peringkat === 2 || item.peringkat === 3) return '#9370F8';
+    return '#C4B5FD';
+  };
+
+  if (rankingBarChart) {
+    rankingBarChart.data.labels = labels;
+    rankingBarChart.data.datasets[0].data = values;
+    rankingBarChart.update();
+    return;
+  }
+
+  rankingBarChart = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Skor Preferensi (V_i)',
+        data: values,
+        backgroundColor: getBarColor,
+        borderColor: getBarBorderColor,
+        borderWidth: 1,
+        borderRadius: 8,
+        borderSkipped: false,
+        barThickness: 24,
+        maxBarThickness: 30
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: {
+        duration: 600,
+        easing: 'easeOutQuart'
+      },
+      layout: {
+        padding: { top: 4, right: 16, bottom: 4, left: 4 }
+      },
+      onClick: (evt, elements) => {
+        if (elements && elements.length > 0) {
+          const item = rankingChartItems[elements[0].index];
+          if (item) {
+            showDetail(item.id);
+          }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(30, 41, 59, 0.94)',
+          titleColor: '#FFFFFF',
+          bodyColor: '#E2E8F0',
+          borderColor: '#7C69EF',
+          borderWidth: 1,
+          padding: 12,
+          cornerRadius: 12,
+          displayColors: true,
+          callbacks: {
+            title: (items) => {
+              if (!items.length) return '';
+              const item = rankingChartItems[items[0].dataIndex];
+              return item ? item.nama : items[0].label;
+            },
+            label: (ctx) => {
+              const item = rankingChartItems[ctx.dataIndex];
+              if (!item) return '';
+              return [
+                ` Peringkat: #${item.peringkat}`,
+                ` Nilai Preferensi (V_i): ${item.skor.toFixed(4)}`
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          suggestedMax: 1.0,
+          border: { display: false },
+          grid: {
+            color: 'rgba(124, 105, 239, 0.08)',
+            drawTicks: false
+          },
+          ticks: {
+            color: '#475569',
+            padding: 8,
+            font: {
+              family: "'Plus Jakarta Sans', sans-serif",
+              size: 11,
+              weight: '600'
+            }
+          }
+        },
+        y: {
+          border: { display: false },
+          grid: { display: false },
+          ticks: {
+            color: '#475569',
+            padding: 10,
+            font: {
+              family: "'Plus Jakarta Sans', sans-serif",
+              size: 12,
+              weight: '700'
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+// Initial draw on DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+  renderSvgNodeMap();
+  renderRankingBarChart();
+});
+{% endif %}
+</script>
+{% endblock %}

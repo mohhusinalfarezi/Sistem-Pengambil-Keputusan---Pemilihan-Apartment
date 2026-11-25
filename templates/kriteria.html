@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Kriteria & Bobot – SPK Apartemen{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <h1><i class="bi bi-sliders2 me-2 text-primary-spk"></i>Kriteria &amp; Bobot</h1>
+    <div class="subtitle">Kelola kriteria keputusan dan distribusi bobot</div>
+  </div>
+  <a href="{{ url_for('kriteria_tambah') }}" class="btn-spk btn-spk-primary">
+    <i class="bi bi-plus-circle"></i> Tambah Kriteria
+  </a>
+</div>
+
+<!-- Status bobot bar -->
+{% set pct = (total_bobot * 100) | round(4) %}
+<div class="glass-card mb-4">
+  <div class="card-pad d-flex align-items-center gap-3 flex-wrap" style="padding:16px 24px;">
+    <i class="bi bi-pie-chart" style="font-size:1.2rem; color:var(--primary);"></i>
+    <span style="font-size:.84rem; font-weight:600;">Total Bobot:</span>
+    <div class="progress-spk flex-grow-1" style="max-width:280px;">
+      <div class="bar {% if (pct - 100)|abs < 0.01 %}valid{% else %}invalid{% endif %}"
+           style="width:{{ [pct,100]|min }}%;"></div>
+    </div>
+    <span style="font-size:.84rem; font-weight:800; color:{% if (pct - 100)|abs < 0.01 %}var(--benefit-color){% else %}var(--cost-color){% endif %};">
+      {{ "%.4f"|format(total_bobot) }} ({{ pct }}%)
+    </span>
+    {% if (pct - 100)|abs < 0.01 %}
+      <span class="badge-spk badge-benefit"><i class="bi bi-check-circle me-1"></i>Valid</span>
+    {% else %}
+      <span class="badge-spk badge-cost"><i class="bi bi-exclamation-circle me-1"></i>Belum 100%</span>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Tabel Kriteria -->
+<div class="glass-card">
+  <div class="card-header-spk">
+    <i class="bi bi-table text-primary-spk"></i>
+    Daftar Kriteria ({{ kriterias | length }})
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="spk-table">
+      <thead>
+        <tr>
+          <th style="width:48px;">#</th>
+          <th>Kode</th>
+          <th>Nama Kriteria</th>
+          <th>Tipe</th>
+          <th>Bobot</th>
+          <th>Distribusi</th>
+          <th style="text-align:right;">Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for krt in kriterias %}
+        <tr>
+          <td style="color:var(--text-muted); font-size:.78rem;">{{ loop.index }}</td>
+          <td><span class="badge-spk badge-primary">{{ krt.kode }}</span></td>
+          <td style="font-weight:600;">{{ krt.nama }}</td>
+          <td>
+            <span class="badge-spk {% if krt.tipe == 'benefit' %}badge-benefit{% else %}badge-cost{% endif %}">
+              {{ krt.tipe | upper }}
+            </span>
+          </td>
+          <td style="font-weight:700; font-family:monospace;">{{ "%.4f"|format(krt.bobot) }}</td>
+          <td style="min-width:120px;">
+            <div class="progress-spk">
+              <div class="bar" style="width:{{ (krt.bobot * 100)|round(1) }}%;"></div>
+            </div>
+            <div style="font-size:.68rem; color:var(--text-muted); margin-top:2px;">{{ (krt.bobot * 100)|round(1) }}%</div>
+          </td>
+          <td style="text-align:right; white-space:nowrap;">
+            <a href="{{ url_for('kriteria_edit', kid=krt.id) }}"
+               class="btn-spk btn-spk-outline btn-spk-icon me-1" title="Edit">
+              <i class="bi bi-pencil"></i>
+            </a>
+            <form method="POST" action="{{ url_for('kriteria_hapus', kid=krt.id) }}"
+                  class="d-inline"
+                  onsubmit="return confirm('Hapus kriteria {{ krt.nama }}?');">
+              <button type="submit" class="btn-spk btn-spk-danger btn-spk-icon" title="Hapus">
+                <i class="bi bi-trash3"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center" style="padding:48px 0; color:var(--text-muted);">
+            <i class="bi bi-inbox" style="font-size:2.5rem; color:var(--border-light);"></i>
+            <div class="mt-2">Belum ada kriteria. <a href="{{ url_for('kriteria_tambah') }}" style="color:var(--primary); font-weight:600;">Tambah sekarang</a>.</div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      {% if kriterias %}
+      <tfoot>
+        <tr>
+          <td colspan="4" style="text-align:right;">Total Bobot:</td>
+          <td style="color:{% if (pct-100)|abs < 0.01 %}var(--benefit-color){% else %}var(--cost-color){% endif %};">
+            {{ "%.4f"|format(total_bobot) }}
+          </td>
+          <td colspan="2"></td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+
+<!-- Keterangan -->
+<div class="d-flex flex-wrap gap-3 mt-3" style="font-size:.78rem; color:var(--text-muted);">
+  <div class="d-flex align-items-center gap-2">
+    <span class="badge-spk badge-benefit">BENEFIT</span>
+    Semakin besar → semakin baik
+  </div>
+  <div class="d-flex align-items-center gap-2">
+    <span class="badge-spk badge-cost">COST</span>
+    Semakin kecil → semakin baik
+  </div>
+</div>
+{% endblock %}
